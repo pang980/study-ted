@@ -232,3 +232,25 @@
 - **T49(산출물)**: `npm run dist` → `dist/StudyTED-Setup-1.0.0.exe` + `.blockmap` + `dist/latest.json`. 배너·설치본 모두 `app.getVersion()`(=`package.json` 의 `1.0.0`) 을 쓴다.
 - 검증 요약: 문법 0 실패 · 단위 **81/81**(update 3 + update-feed 11 추가) · 스모크 **96/0**(home 버전 표시·업데이트 버튼, settings 업데이트 카드 3건 추가) · `npm run dist` 성공 · `dist/win-unpacked/resources/app.asar` 안에 `clearLatest`·`UPDATE_NO_FEED`·`apply-update.cmd`·`update-banner` 포함 확인
 - **알려진 한계**: 사용자가 설정에 업데이트 정보 주소를 넣지 않으면 배너는 `업데이트 주소를 설정하면 새 버전이 나올 때 알려 드립니다.` 라고만 안내한다(자동 업데이트 서버를 앱에 내장하지 않는다).
+
+## 17차 라운드 완료 기록 (2026-09-24)
+
+사용자 요청 1건("니가 git 올려서 자동다운로드 하도록 해야지.. 내가 올려?")을 처리했다. 즉 **배포 주체를 개발자 서버에서 GitHub Releases 로 옮기고, 앱이 그 릴리스를 보고 스스로 업데이트하게** 만들었다. T51·T52 를 추가했다.
+
+| 태스크 | 내용 | 상태 | 수정 파일 |
+|---|---|---|---|
+| T51 | GitHub 저장소 생성 + 첫 푸시 + v1.0.0 릴리스(설치본·blockmap·latest.json) 업로드 | DONE | `git`(init/commit/push), `.gitignore`, `.gitattributes`(기존), `.editorconfig`(기존) |
+| T52 | 기본 업데이트 주소 내장 + `npm run release` 배포 자동화 | DONE | `main/db/settings.js`, `scripts/release.js`(신규), `package.json`, `build/release-notes.md`(신규), `README.md` |
+
+- **T51(저장소)**: 이 폴더는 git 저장소가 아니었고, `gh` CLI 는 `pang980` 계정으로 이미 로그인돼 있었다(scopes `repo`·`workflow`). `git init -b main` → 첫 커밋 87개 파일 → `gh repo create study-ted --public --source . --remote origin --push`.
+  - 저장소: <https://github.com/pang980/study-ted> (**public** — 로그인 없이 릴리스 자산을 받을 수 있어야 앱의 자동 업데이트가 동작한다)
+  - 커밋에서 제외된 것: `.env`(키), `node_modules/`, `dist/`(122.9MB 설치본), `_tmp/`, `build/bin/yt-dlp.exe`(17MB). `.gitignore` 에 `.env`·`.env.*` 를 **새로 추가**했다(16차까지는 없었다).
+  - 저장소 로컬 설정으로 `user.name=pang980` / `user.email=pang980@gmail.com` 을 지정했다(전역 값의 메일 오타 `gamil.com` 때문에 커밋이 계정에 연결되지 않는 것을 피하려고 **이 저장소에만** 적용).
+- **T51(릴리스)**: `gh release create v1.0.0 dist\StudyTED-Setup-1.0.0.exe dist\StudyTED-Setup-1.0.0.exe.blockmap dist\latest.json` 로 3개 자산 업로드. 태그 `v1.0.0`, 제목 `StudyTED v1.0.0`.
+  - 피드 주소: `https://github.com/pang980/study-ted/releases/latest/download/latest.json` → 실제로 200 + JSON 응답 확인.
+  - 자산 주소: 같은 경로의 `StudyTED-Setup-1.0.0.exe` → 200 확인. GitHub 이 보고한 자산 `digest`(`sha256:078f2fdff6…`)와 `latest.json` 의 `sha256` 이 일치했다.
+- **T52(기본 주소)**: `main/db/settings.js` 의 `DEFAULTS` 에 `DEFAULT_UPDATE_FEED_URL` 상수를 넣어 `update.feedUrl` 기본값으로 썼다. 16차의 "주소를 넣어야만 업데이트를 확인한다"는 한계를 없애 **설치만 하면 자동 확인이 동작**한다. `getValue` 는 DB 행이 없으면 `DEFAULTS` 를 돌려주므로 기존 사용자 DB 에도 그대로 적용된다(마이그레이션 불필요).
+- **T52(배포 자동화)**: `scripts/release.js` + `npm run release`. 사전 점검(`gh auth status`, `origin` 원격) → `npm run dist` → `dist/latest.json` 의 `version` 이 `package.json` 과 같은지 확인 → 자산 3개 존재 확인 → 같은 태그가 있으면 `gh release upload --clobber` + `gh release edit --notes-file`, 없으면 `gh release create`. 마지막에 피드 주소를 출력한다.
+- **T52(주의)**: `gh`·`git` 은 `.exe` 라 `shell:false` 로 실행하고(Node 가 인자 인용을 처리하므로 `--title "StudyTED v1.0.0"` 같은 공백 인자가 안전), `npm` 만 `.cmd` 라서 `shell:true` 로 실행한다.
+- 검증 요약: `npm test` **81/81** · `npm run smoke` **96/0** · `npm run dist` 성공(asar 안에 새 기본 주소 포함 확인) · `npm run release` **실제 실행 성공**(v1.0.0 자산 덮어쓰기 + 피드 sha256 갱신 확인).
+- **한계**: 저장소를 비공개로 바꾸면 로그인 없이 자산을 받을 수 없어 자동 업데이트가 멈춘다(이때는 직접 호스팅한 `latest.json` 주소를 설정에 넣어야 한다). 코드 사이닝은 여전히 하지 않아 설치 시 SmartScreen 경고가 뜰 수 있다.

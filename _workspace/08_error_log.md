@@ -125,3 +125,14 @@
 | 2026-09-24 | 테스트 작성 | `assert.rejects(update.install())` 가 "missing expected rejection" 으로 실패 | 개발 실행 분기가 **동기 throw** 인데 `assert.rejects` 는 Promise 를 요구한다 | `assert.throws` 로 교체 | 해결 |
 | 2026-09-24 | 테스트 작성 | `download()` 가 `UPDATE_NO_FEED` 로 실패 | `check()` 로 피드를 읽어 `latest` 를 채우기 **전에** 다운로드를 호출했다 | 테스트에서 `check()` → `download()` 순서로 고정 | 해결 |
 | 2026-09-24 | 테스트 작성 | 설치 스크립트 줄 비교가 항상 실패 | 히어스트링 안에서 `split('\\r\\n')` 을 써서 실제 `\r\n` 이 아니라 리터럴 `\r\n` 문자열(백슬래시 포함)을 찾고 있었다 | `split('\r\n')` 로 수정 | 해결 |
+
+## 17차 라운드 (GitHub 릴리스 배포)
+
+| 시각 | 단계 | 증상 | 원인 | 조치 | 상태 |
+|---|---|---|---|---|---|
+| 2026-09-24 | 파일 수정 | `settings.js` 패치 스크립트가 `MISS: anchor` 로 중단 | 파일이 **LF** 인데 앵커 문자열에 `\r\n` 을 넣어 비교했다 | `StartsWith` 로 바꾸고 삽입 문자열은 `\r\n` 으로 쓴 뒤, 마지막에 파일 전체를 LF 로 정규화(`crlf=5` → 0) | 해결 |
+| 2026-09-24 | 파일 수정 | `.gitignore` 에서 `!_tmp/yt-dlp.exe` 한 줄이 지워지지 않음 | 히어스트링 줄바꿈이 CRLF 로 들어가 그 줄 끝이 `…exe\r\n` 이 되었는데 `Replace` 는 `…exe\n` 을 찾았다 | `.gitignore` 를 줄 배열로 **전체 재작성**(LF, BOM 없음). `!_tmp/…` 는 부모 폴더가 무시되면 효력이 없어 함께 제거 | 해결 |
+| 2026-09-24 | 릴리스 조회 | `gh release view --json assets --jq` 가 `failed to parse jq expression` 으로 실패 | jq 식의 문자열 리터럴 인용이 PowerShell 을 거치며 사라졌다 | `--jq` 없이 기본 JSON 출력을 읽어 판단 | 해결 |
+| 2026-09-24 | 검증 | `curl` 결과를 `ConvertFrom-Json` 하니 `version`·`sha256` 이 빈 값 | PowerShell 파이프라인에서 `curl.exe` 출력이 줄 배열로 들어와 직렬화가 어긋났다 | `curl -o <파일>` 로 받은 뒤 `Get-Content -Encoding UTF8` 로 읽어 변환 | 해결 |
+| 2026-09-24 | 배포 스크립트 | `spawnSync(..., { shell: true })` 로 `gh` 를 부르면 `--title StudyTED v1.0.0` 이 공백에서 쪼개질 위험 | `shell:true` 는 인자 배열을 인용 없이 공백으로 이어 붙인다 | `gh`·`git` 은 `shell:false`(Node 가 인용 처리), `.cmd` 인 `npm` 만 `shell:true` 로 분리 | 해결 |
+| 2026-09-24 | 문서 작성 | 하네스 표 안에 코드로 쓴 파이프 문자가 셀 구분자로 해석될 뻔함 | 마크다운 표 셀 안의 `\|` 이스케이프 규칙 | 해당 셀 문구를 파이프 없는 표현으로 바꿔 다시 작성 | 해결 |

@@ -263,3 +263,22 @@
 7. **설정을 바꾸면 이전 상태를 버린다**: 피드 주소를 지우거나 다른 곳으로 바꾸면 이전 버전의 `latest`·진행률이 남아 있으면 안 된다. `clearLatest()` 로 비우고 `idle` 로 되돌린다(다운로드·설치 중에는 유지).
 8. **번들 바이너리는 탐색 순서로 해결한다**: yt-dlp 를 `extraResources` 로 `resources/bin` 에 넣고, 탐색 순서에 그 경로를 추가한다. 사용자가 설정에서 지정한 경로가 항상 1순위다.
 9. **회귀 방지선을 남긴다**: 피드/다운로드는 로컬 HTTP 서버 + `electron` 모듈 스텁으로 단위 테스트하고(주소 없음·`ftp://` 거부, 302 추적, sha256 불일치, 주소 삭제 시 상태 초기화, 자동 확인 요청 0회, `/D=` 한 줄 규칙), 화면은 스모크로 확인한다.
+
+## 17차 수정 계획 (GitHub 릴리스로 자동 업데이트)
+
+1. 저장소 만들기: `.gitignore` 에 `.env`·`.env.*` 추가 → `git init -b main` → 87개 파일 첫 커밋 → `gh repo create study-ted --public --source . --remote origin --push`
+2. 릴리스 올리기: `npm run dist` 재빌드(기본 업데이트 주소가 asar 에 들어가야 하므로 **주소 변경 후 빌드**) → `gh release create v1.0.0` 로 설치본·blockmap·`latest.json` 업로드
+3. 앱이 그 릴리스를 보게 만들기: `main/db/settings.js` 의 `update.feedUrl` 기본값을 릴리스 피드 주소로
+4. 다음 버전 배포 자동화: `scripts/release.js` + `npm run release`, 릴리스 설명용 `build/release-notes.md`
+5. 검증: `npm test` → `npm run smoke` → `npm run dist`(asar 안 기본 주소 확인) → `npm run release` 실제 실행 → **공개 피드 주소를 curl 로 받아 sha256·버전·자산 200 확인**
+6. 기록: `03_task_board.md`(T51·T52) · `04_file_map.md` · `05_edit_plan.md` · `06_implementation_spec.md` · `07_validation.md` · `08_error_log.md` · `99_decisions.md`(D-035) · `README.md`
+
+### 설계 원칙
+
+1. **저장소는 공개여야 한다**: 앱은 인증 없이 `https` 로 피드를 읽는다. 비공개면 자동 업데이트가 404 로 멈추므로 공개를 전제로 하고, 대신 `.env`·설치본·`node_modules`·`_tmp` 를 커밋에서 제외한다.
+2. **기본값은 "동작하는 주소"**: 사용자가 아무것도 하지 않아도 업데이트가 확인되도록 기본 피드 주소를 코드에 넣는다. 값은 DB 행이 없을 때만 쓰이므로 사용자가 바꾼 주소를 덮어쓰지 않는다.
+3. **주소 변경 → 재빌드 순서를 지킨다**: 기본 주소는 `app.asar` 안에 들어가므로, 주소를 바꾼 뒤 **다시 빌드한 설치본**을 올려야 한다(빌드 → 주소 변경 순서로 하면 배포본에 옛 기본값이 남는다).
+4. **자산 URL 은 상대 경로로 둔다**: `latest.json` 의 `url` 을 절대 주소로 굳히면 저장소 이름·미러 변경 때 피드까지 고쳐야 한다. `new URL(value, feedUrl)` 해석이 `releases/latest/download/` 아래에서도 같은 폴더를 가리키는 것을 실제 응답으로 확인했다.
+5. **배포는 한 명령으로**: 사람이 하는 일은 버전 올리기와 설명 쓰기뿐이고, 빌드·업로드·덮어쓰기 판단은 `scripts/release.js` 가 한다. 실패하면 어느 단계에서 멈췄는지 한국어로 알려 준다.
+6. **인자 인용은 런타임에 맡긴다**: `gh`·`git` 은 `shell:false`(Node 가 인용), `npm` 은 `.cmd` 라서 `shell:true`. 셸 문자열 조립으로 `--title StudyTED v1.0.0` 같은 인자를 만들면 공백에서 쪼개진다.
+7. **커밋 전 비밀 점검**: `_workspace/*.md`·`README.md` 에 `sk-or-` 패턴이 0건임을 확인하고, `git diff --cached --name-only` 로 `.env` 가 없는지 눈으로 확인한 뒤 커밋한다.

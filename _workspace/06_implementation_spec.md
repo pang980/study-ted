@@ -497,3 +497,52 @@ del "%~f0"
 - `test/update.test.js` — `parseVersion`/`isNewer` 3건
 - `test/update-feed.test.js` — `electron` 모듈을 `require.cache` 스텁(`app.getVersion → '1.0.0'`, `isPackaged:false`, `getPath('userData') → tmp`)으로 대체하고 로컬 `http.createServer` 로 피드·302·상대 자산·설치본을 서빙해 11건: 주소 없음/`ftp://` 거부, `available`/`current`, 302 추적 + 상대 자산 URL 해석, 다운로드 + sha256 + `.part` 잔여 0 + 재확인 시 `ready` 재사용 + `cleanupDownloads` keep/drop, sha256 불일치 → `UPDATE_HASH`, 주소 삭제 시 `latest` 초기화, 서버 503 → `UPDATE_HTTP`, 개발 실행 `install()` → `UPDATE_DEV`, 자동확인 요청 0회 · 6시간 내 재요청 없음, 조용한 설치 스크립트 `/D=` 한 줄 규칙
 - `scripts/smoke.js` — home 프로브 `view:home 버전 표시`(StudyTED + 버전 + 업데이트 버튼), `view:home 업데이트 버튼`; settings 프로브 `view:settings 업데이트 카드`(`textInput===1 && checks===2 && buttons.includes('업데이트 확인') && /현재 버전/`)
+
+## 17차 구현 명세 (GitHub 릴리스 배포 + 기본 업데이트 주소)
+
+### 1. 저장소 · 배포 구성
+
+| 항목 | 값 |
+|---|---|
+| 저장소 | `https://github.com/pang980/study-ted` (public, 기본 브랜치 `main`) |
+| 릴리스 태그 | `v<package.json version>` (예: `v1.0.0`) |
+| 릴리스 자산 | `StudyTED-Setup-<버전>.exe`, `StudyTED-Setup-<버전>.exe.blockmap`, `latest.json` |
+| 피드 주소(앱 기본값) | `https://github.com/pang980/study-ted/releases/latest/download/latest.json` |
+| 커밋 제외 | `.env`, `.env.*`, `node_modules/`, `_tmp/`, `dist/`, `build/bin/`, `*.log`, `data/` |
+
+### 2. `main/db/settings.js`
+
+- `DEFAULT_UPDATE_FEED_URL` 상수(위 피드 주소) 신설.
+- `DEFAULTS['update.feedUrl']` 을 `''` → `DEFAULT_UPDATE_FEED_URL` 로 변경.
+- `getValue(key, fallback)` 는 `getRaw` 가 돌려준 값이 `null` 이 아니면 그 값을 쓰므로, **DB 행이 없으면 기본 주소가 적용되고 사용자가 저장한 주소가 있으면 그 값이 우선**한다. 스키마·마이그레이션 변경 없음.
+
+### 3. `scripts/release.js` (`npm run release`)
+
+```
+capture('gh', ['auth', 'status'])            # 실패 → "gh auth login 먼저"
+capture('git', ['remote', 'get-url', 'origin'])
+runShell('npm run dist')                     # 빌드 + dist/latest.json
+manifest = dist/latest.json                  # version 이 package.json 과 같은지 확인
+assets = [exe, exe.blockmap, latest.json]    # 3개 모두 존재해야 진행
+existing = capture('gh', ['release', 'view', tag])
+  있으면  → gh release upload <tag> <assets> --clobber  +  gh release edit <tag> --notes-file build/release-notes.md
+  없으면  → gh release create <tag> <assets> --title "StudyTED <tag>" --notes-file …
+print  업데이트 주소(피드 URL)
+```
+
+- `run(command, args)` = `shell:false`(gh·git), `runShell(line)` = `shell:true`(npm). `capture()` 는 stdout 을 문자열로 돌려준다.
+- 실패는 모두 `[중단] …` 메시지 + `process.exit(1)`.
+
+### 4. `build/release-notes.md`
+
+- 릴리스 설명 원문(마크다운). `scripts/make-manifest.js` 가 읽어 `latest.json` 의 `notes`(2000자 상한)로 넣고, `scripts/release.js` 가 `gh release create/edit --notes-file` 로 그대로 올린다.
+- 새 버전을 낼 때 이 파일을 갱신하지 않으면 이전 설명이 그대로 올라간다(스크립트가 경고하지 않으므로 사람이 확인).
+
+### 5. 버전 배포 절차 (사용자용)
+
+    npm version 1.0.1 --no-git-tag-version   # package.json 버전 올리기
+    # build\release-notes.md 갱신 (선택)
+    npm run release                          # 빌드 + v1.0.1 릴리스 생성/갱신
+
+- 설치된 앱은 시작 8초 후·6시간마다 피드를 확인한다. 새 버전이면 홈 배너가 `새 버전 v1.0.1 이 있습니다` 로 바뀌고 `업데이트 내려받기` → `지금 설치하고 다시 시작` 으로 갱신된다.
+- 1.0.0 → 1.0.1 처럼 `package.json` 의 `version` 만 올리면 태그·자산 이름·피드 버전이 모두 따라온다.

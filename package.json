@@ -17,7 +17,8 @@
     "prepare:bin": "node scripts/prepare-bin.js",
     "manifest": "node scripts/make-manifest.js",
     "dist": "node scripts/prepare-bin.js && electron-builder --win && node scripts/make-manifest.js",
-    "dist:dir": "node scripts/prepare-bin.js && electron-builder --win --dir"
+    "dist:dir": "node scripts/prepare-bin.js && electron-builder --win --dir",
+    "release": "node scripts/release.js"
   },
   "keywords": [
     "electron",

@@ -388,3 +388,22 @@
 | `renderer/js/views/settings.js` | `updateCard` 추가 + element 순서 `keyCard, collectCard, modelCard, updateCard, dataCard`(185행), `현재 버전 v…` 라벨(403행), 단계별 버튼 문구 전환(438행) | 업데이트 설정 |
 | `renderer/css/components.css` | `.update-banner*` (행 배치 · 버전 라벨 · 상태 문구 · 진행 바 · 버튼 묶음) | 배너 스타일 |
 | `scripts/smoke.js` | home 프로브에 `view:home 버전 표시`·`view:home 업데이트 버튼`, settings 프로브에 `view:settings 업데이트 카드`(`textInput===1 && checks===2 && buttons.includes('업데이트 확인') && /현재 버전/`) | 회귀 방지선 |
+
+## 17차 (GitHub 릴리스 배포) — 추가·수정 파일
+
+### 추가 파일
+
+| 파일 | 역할 |
+|---|---|
+| `scripts/release.js` | 배포 도우미(`npm run release`). `gh auth status`·`origin` 원격 점검 → `npm run dist` → `dist/latest.json` 버전 일치·자산 3종 존재 확인 → `gh release create`(태그가 있으면 `upload --clobber` + `edit --notes-file`) → 피드 주소 출력 |
+| `build/release-notes.md` | 릴리스 설명 원문. `scripts/make-manifest.js` 가 `latest.json` 의 `notes`(2000자 상한)로 넣고, `scripts/release.js` 가 `gh release --notes-file` 로도 쓴다 |
+| `.git/` | 새로 만든 로컬 저장소(`main` 브랜치, `origin` = `https://github.com/pang980/study-ted.git`) |
+
+### 수정 파일
+
+| 파일 | 변경 | 이유 |
+|---|---|---|
+| `.gitignore` | `.env`, `.env.*` 추가 | openrouter 키가 든 `.env` 가 공개 저장소로 올라가는 것을 막는다(16차까지는 `node_modules/`·`_tmp/`·`dist/`·`build/bin/`·`*.log`·`data/` 만 있었다) |
+| `main/db/settings.js` | `DEFAULT_UPDATE_FEED_URL` 상수 신설 + `DEFAULTS['update.feedUrl']` 을 그 값으로 | 설치만 하면 자동 업데이트가 동작해야 한다(D-035). DB 행이 없을 때만 쓰이므로 사용자가 설정한 주소가 항상 우선한다 |
+| `package.json` | 스크립트 `release` 추가 | 배포 한 줄 명령 |
+| `README.md` | 명령 목록에 `npm run release`, **GitHub 릴리스로 배포 (기본 경로)** 절 신설, 주요 기능 9번에 "기본 주소 내장" 문구, 업데이트 배포 3번 단계에 기본값 안내, 폴더 구조 `scripts/` 설명에 릴리스 보조 추가 | 배포·업데이트 사용법 |

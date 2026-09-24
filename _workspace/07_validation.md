@@ -737,3 +737,35 @@ npm run dist      # node scripts/prepare-bin.js && electron-builder --win && nod
 - 앱 시작 시 `cleanupDownloads()` 와 8초 뒤 `autoCheck()` 가 도는데, 피드 주소가 없으면 **아무 요청도 하지 않으므로** 기존 사용자 환경에 부하·오류 로그가 생기지 않는다.
 - **한계**: 업데이트 피드(JSON)를 올릴 서버는 사용자가 준비해야 한다. 주소를 넣지 않으면 배너는 안내 문구만 보여 준다.
 - **한계**: 설치본 서명(코드 사이닝)은 하지 않았다. Windows SmartScreen 경고가 뜰 수 있다.
+
+## 17차 검증 (GitHub 릴리스 배포 · 기본 업데이트 주소)
+
+### 1. 단위 테스트 · 스모크
+
+- `npm test` (`node --test test/*.test.js`) → **81 / 81 pass, 0 fail**. 기본 피드 주소를 넣은 뒤에도 업데이트 관련 14건(update 3 + update-feed 11)이 그대로 통과했다(테스트는 `require.cache` 스텁으로 `electron` 을 대체하고 로컬 HTTP 서버를 쓰므로 기본값과 무관하게 동작).
+- `npm run smoke` → **96 확인 / 실패 0**. `view:home 버전 표시`(StudyTED + 버전), `view:home 업데이트 버튼`, `view:settings 업데이트 카드`(입력 1 · 체크 2 · 버튼 4) 모두 통과.
+
+### 2. 빌드 · asar 반영
+
+- `npm run dist` 성공 → `dist\StudyTED-Setup-1.0.0.exe` (122.9MB) · `.blockmap` · `dist\latest.json`.
+- `dist\win-unpacked\resources\app.asar` 를 읽어 `github.com/pang980/study-ted/releases/latest/download/latest.json` 문자열이 들어 있는지 확인 → **True**(기본 주소가 포장된 코드에 반영됨). `update-banner` 도 함께 확인.
+
+### 3. GitHub 저장소 · 릴리스
+
+- `gh repo view pang980/study-ted` → `visibility: PUBLIC`, `defaultBranchRef: main`.
+- 첫 푸시: 커밋 1개(`StudyTED v1.0.0 - YouTube 자막 기반 영어 학습 데스크톱 앱`), 추적 파일 87개. `git ls-files` 기준 `.env`·`node_modules`·`dist`·`_tmp`·`build/bin` **포함되지 않음**.
+- `gh release view v1.0.0 --json assets` → 자산 3개(`latest.json` 876B, `StudyTED-Setup-1.0.0.exe` 128,832,523B, `.blockmap` 135,445B) 모두 `state: uploaded`.
+
+### 4. 실제 피드 응답 (외부에서 확인)
+
+- `curl https://github.com/pang980/study-ted/releases/latest/download/latest.json` → **HTTP 200 / 876 bytes**, `version` `1.0.0`, `sha256` `d82cec3cb98408dcd8885ceda0fdc204bb3dcbb08e91298e5a11673b67be1dfb` — 로컬 `dist\latest.json` 값과 **일치**.
+- 같은 경로의 `StudyTED-Setup-1.0.0.exe` → **HTTP 200 / application/octet-stream**. 상대 경로 `url` 이 `releases/latest/download/` 아래에서 정확히 해석됨을 확인.
+- `gh release view` 가 보고한 자산 `digest` (`sha256:078f2fdff643de5b…`, 첫 업로드 시점)와 그때의 `latest.json` `sha256` 이 일치 → 릴리스 자산과 피드가 같은 파일을 가리킨다.
+- 참고: 검증 중 `npm run release` 를 실제로 한 번 더 실행해(빌드 + `--clobber` 덮어쓰기) v1.0.0 자산을 갱신했고, 피드의 `sha256` 이 새 값(`d82cec3c…`)으로 바뀌는 것까지 확인했다. 즉 **배포 스크립트가 실사용 경로로 동작**한다.
+
+### 5. 회귀 없음 · 알려진 한계
+
+- 앱 코드 변경은 `main/db/settings.js` 의 기본값 1곳뿐이다. 수집·재생·문장 노트·AI 분석 경로는 손대지 않았고 스모크 96/0 으로 확인했다.
+- 기본 주소가 생겼으므로, 이제 **앱 시작 8초 후 실제로 GitHub 에 요청이 나간다**(16차에는 주소가 비어 있어 요청 0회였다). 네트워크가 없으면 배너가 오류 문구를 띄우고 나머지 기능은 그대로 동작한다.
+- **한계**: 저장소를 비공개로 바꾸면 인증 없는 피드 조회가 실패해 자동 업데이트가 멈춘다(설정에서 직접 호스팅 주소를 넣어야 한다). 릴리스 자산만으로 업데이트하므로 **설치본을 받는 사람도 인터넷과 GitHub 접근이 필요**하다.
+- **한계**: 코드 사이닝 미적용 → SmartScreen 경고 가능. `npm run release` 는 `gh` CLI 로그인과 `origin` 원격이 있어야 한다(스크립트가 먼저 검사한다).
