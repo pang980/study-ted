@@ -806,3 +806,13 @@ npm run dist      # node scripts/prepare-bin.js && electron-builder --win && nod
   - `view:notes 편집 창 배경 클릭 유지·Esc 닫기 :: 배경 클릭 유지 true / Esc 닫기 true`
 - 기존 항목 회귀 없음: `view:notes 분석 표시`(상세 1 / 카드 1 / 버튼 1 / 요약 1), `분석 펼치기`, `구문 영어 표시`, `구문 뜻 표시`, `AI 원문 응답 없음`, `문장 클릭 상세`, `분석 보기 높이 해제`, `삭제 동작`(4 → 3).
 - 배경 클릭으로 닫히지 않는지, Esc 로 닫히는지 실제 DOM 이벤트로 확인했다(수정 창을 열고 배경 클릭 → 유지, Esc → 닫힘).
+
+## 20차 라운드 검증 (2026-09-24) — v1.0.1 배포
+
+- 사전 조건: `Get-Process StudyTED` = 0, `electron` = 0 (앱 종료 확인), `ELECTRON_RUN_AS_NODE` 해제 후 실행.
+- `gh auth status` → `pang980` (scopes: gist, read:org, repo, workflow) / `origin` = https://github.com/pang980/study-ted.git.
+- `npm run release` 종료 코드 **0** · 마지막 줄 `배포 완료 / 122.9 MB · sha256 0424ebb1b3bc08b6…` · 릴리스 URL https://github.com/pang980/study-ted/releases/tag/v1.0.1
+- `gh release view v1.0.1` → `tagName v1.0.1`, 자산 3종 `state=uploaded`(latest.json / StudyTED-Setup-1.0.1.exe / .blockmap).
+- 피드 실측(`Invoke-RestMethod releases/latest/download/latest.json`) → `feed version: 1.0.1` / `url: StudyTED-Setup-1.0.1.exe` (`releases/latest` 가 v1.0.1 을 가리킴).
+- `git push origin main` → `b777f18..ec82f14  main -> main`(PowerShell 은 stderr 를 오류로 표시하지만 성공) · `git ls-remote origin main` = `ec82f141511b60cd0392e4a3748f27b695e5cc29` (로컬 HEAD 와 일치).
+- 기존 기능 회귀 없음: 19차 기준 `npm test` 82/82 · `npm run smoke` 101 확인 / 실패 0 (이번 라운드는 빌드·배포만 수행, 코드 변경 없음).

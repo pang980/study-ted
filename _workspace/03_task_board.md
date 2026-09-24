@@ -293,3 +293,20 @@
 - **T59(수정)**: `renderAnalysisCard()` 에 `head = true` 옵션을 추가하고, 목록 상세(문장 노트·학습 자료)에서는 `head: false` 로 제목 줄(`저장된 AI 분석` + 모델명)을 그리지 않는다. 오염 경고 두 종류(`.analysis__warn`)는 **함수에서 아예 제거**해 어떤 화면에서도 나오지 않는다. 상세는 `.detail-sentence`(원문) 바로 아래 `1. 문장 해석` + `2. 구문 분석` 만 보인다.
 - **T59(중복 제거)**: 상세의 `.detail-translation` 줄은 카드의 `1. 문장 해석` 과 같은 값이라 뺐다(해석만 저장된 문장도 `hasAnalysis()` 가 참이라 카드가 그대로 보여 준다).
 - 검증 요약: `npm test` **82/82** · `npm run smoke` **101 확인 / 실패 0**(`view:notes 안내·재분석 버튼 없음`, `view:notes 편집 창 배경 클릭 유지·Esc 닫기` 신규).
+
+## 20차 라운드 완료 기록 (2026-09-24) — v1.0.1 배포
+
+19차 UI 수정(T57~T59)을 담은 **v1.0.1** 을 GitHub Releases 에 배포하고 저장소 main 에 반영했다. (사용자가 앱을 종료한 것을 확인한 뒤 진행)
+
+| 태스크 | 내용 | 상태 | 결과 |
+|---|---|---|---|
+| T60-1 | `build/release-notes.md` 를 v1.0.1 내용으로 교체 | DONE | `_tmp/notes101.js` ("notes OK") |
+| T60-2 | `package.json`/`package-lock.json` 버전 1.0.1 | DONE | `npm version 1.0.1 --no-git-tag-version` → `v1.0.1` |
+| T60-3 | `npm run release` (dist 빌드 + 태그 + 자산 업로드) | DONE | https://github.com/pang980/study-ted/releases/tag/v1.0.1 |
+| T60-4 | 저장소 main 커밋·푸시 | DONE | `ec82f14` (`b777f18..ec82f14 main -> main`) |
+| T60-5 | 릴리스 자산·업데이트 피드 확인 | DONE | 자산 3종 + 피드 version 1.0.1 |
+
+- **빌드**: `electron-builder 26.15.3` / electron `44.4.4` / `dist\StudyTED-Setup-1.0.1.exe` **122.9 MB** / sha256 `0424ebb1b3bc08b6…`. `dist\win-unpacked` 로컬 실행 파일도 함께 생성됨.
+- **자산 3종**: `StudyTED-Setup-1.0.1.exe`(128,832,926 bytes) · `StudyTED-Setup-1.0.1.exe.blockmap` · `latest.json`(1,542 bytes).
+- **업데이트 피드**: https://github.com/pang980/study-ted/releases/latest/download/latest.json → `version` `1.0.1`, `url` `StudyTED-Setup-1.0.1.exe` (앱 홈 상단 버전 배지가 이 주소로 확인).
+- 사용자 요청 대응: 홈 상단 버전 표시 + 업데이트 있음 표기 + 클릭 시 다운로드·설치(Electron 피드) 경로가 v1.0.1 로 실제 동작한다.
