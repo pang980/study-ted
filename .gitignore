@@ -1,0 +1,8 @@
+node_modules/
+_tmp/
+dist/
+build/bin/
+*.log
+data/
+.env
+.env.*

@@ -1,0 +1,81 @@
+{
+  "name": "study-ted",
+  "version": "1.0.0",
+  "private": true,
+  "description": "YouTube videos + OpenRouter AI desktop app for English study (Electron + SQLite)",
+  "author": "StudyTED",
+  "main": "main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "demo": "electron . --demo",
+    "test": "node --test test/*.test.js",
+    "smoke": "electron scripts/smoke.js",
+    "e2e": "electron scripts/e2e-collect.js",
+    "e2e:player": "electron scripts/e2e-player.js",
+    "icon": "node scripts/make-icon.js",
+    "prepare:bin": "node scripts/prepare-bin.js",
+    "manifest": "node scripts/make-manifest.js",
+    "dist": "node scripts/prepare-bin.js && electron-builder --win && node scripts/make-manifest.js",
+    "dist:dir": "node scripts/prepare-bin.js && electron-builder --win --dir"
+  },
+  "keywords": [
+    "electron",
+    "english",
+    "youtube",
+    "openrouter"
+  ],
+  "license": "UNLICENSED",
+  "build": {
+    "appId": "com.studyted.desktop",
+    "productName": "StudyTED",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main/**/*",
+      "renderer/**/*",
+      "package.json",
+      "!**/*.map"
+    ],
+    "extraResources": [
+      {
+        "from": "build/bin",
+        "to": "bin"
+      }
+    ],
+    "asar": true,
+    "compression": "normal",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "StudyTED-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "StudyTED",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico"
+    }
+  },
+  "devDependencies": {
+    "electron": "^44.4.4",
+    "electron-builder": "^26.15.3"
+  }
+}

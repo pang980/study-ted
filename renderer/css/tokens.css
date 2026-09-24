@@ -1,0 +1,36 @@
+:root {
+  --titlebar-bg: #243654;
+  --titlebar-bg-2: #30425a;
+  --titlebar-text: #e8eefc;
+  --page-bg: #f0f6f6;
+  --card-bg: #fcfcfc;
+  --panel-bg: #ffffff;
+  --primary: #1e6ff5;
+  --primary-strong: #1558cc;
+  --primary-soft: #e8f0ff;
+  --ai: #5b4bd6;
+  --ai-soft: #efeCFB;
+  --nav-active: #d2e4fc;
+  --input-bg: #ffffff;
+  --selected-bg: #ebf2fe;
+  --highlight-bg: #e3edf8;
+  --border: #e5e9f0;
+  --border-strong: #d5dbe7;
+  --text: #1a2233;
+  --muted: #6b7280;
+  --muted-soft: #98a2b3;
+  --tag-bg: #f0f0f0;
+  --danger: #e5484d;
+  --success: #12805c;
+  --warning: #b7791f;
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-md: 0 8px 24px rgba(16, 24, 40, 0.12);
+  --titlebar-h: 44px;
+  --sidebar-w: 178px;
+  --gap: 14px;
+  --font: "Malgun Gothic", "맑은 고딕", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-en: "Segoe UI", "Malgun Gothic", system-ui, sans-serif;
+}
