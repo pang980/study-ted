@@ -58,7 +58,7 @@ async function listVideos(channelUrl, options = {}) {
   const url = channelUrl.includes('/videos') || channelUrl.includes('/shorts') || channelUrl.includes('/streams')
     ? channelUrl
     : `${channelUrl.replace(/\/$/, '')}/videos`;
-  const args = ['--flat-playlist', '--dump-json', '--no-warnings', '--ignore-errors'];
+  const args = [...playerClientArgs(options.playerClients), '--flat-playlist', '--dump-json', '--no-warnings', '--ignore-errors'];
   if (bounded) args.push('--playlist-end', String(limit));
   args.push(url);
   let seen = 0;
@@ -79,7 +79,8 @@ async function listVideos(channelUrl, options = {}) {
 
 async function getVideo(videoUrl, options = {}) {
   const { exePath, timeoutMs = 120000, signal } = options;
-  const args = ['--dump-single-json', '--no-warnings', '--skip-download', videoUrl];
+  // 단일 동영상 조회도 같은 클라이언트 순서를 쓴다(메타데이터 갱신이 같은 이유로 실패한다).
+  const args = [...playerClientArgs(options.playerClients), IGNORE_NO_FORMATS, '--dump-single-json', '--no-warnings', '--skip-download', videoUrl];
   const { stdout } = await manager.run(exePath, args, { timeoutMs, signal });
   const trimmed = stdout.trim();
   const start = trimmed.indexOf('{');
@@ -124,11 +125,68 @@ function pickSubtitleFile(files, videoId) {
 // 다만 'en' 트랙이 없는 영상이 있으므로 파일이 하나도 안 생기면 넓은 패턴으로 한 번만 다시 시도한다.
 const LANG_ATTEMPTS = ['en', 'en.*,en'];
 
+// yt-dlp 는 플레이어 클라이언트를 골라 영상 정보를 받아온다. 이 버전의 기본 클라이언트(visionos)는
+// 일부 채널의 영상을 "This video is not available" 로 거절하는데, 같은 영상도 android 로는 정상
+// 조회되고 자막도 받아진다(실측: @BlueyOfficialChannel). 그래서 기본 → android 순으로 넘어가게 하고,
+// 그래도 파일이 안 생기면 android/ios 조합으로 한 번 더 시도한다.
+const DEFAULT_PLAYER_CLIENTS = 'default,android';
+const PLAYER_CLIENT_ATTEMPTS = [DEFAULT_PLAYER_CLIENTS, 'android,ios'];
+
+// 자막만 받을 때도 yt-dlp 는 재생 포맷을 고른다. 클라이언트에 따라 포맷이 없어
+// "Requested format is not available" 로 죽는데, 자막은 포맷과 무관하므로 이 오류는 무시하게 한다.
+// (실측: ios/web/mweb/tv 가 이 플래그 하나로 exit 0 이 되고 ios 는 자막도 받아진다.)
+const IGNORE_NO_FORMATS = '--ignore-no-formats-error';
+
+function playerClientArgs(playerClients = DEFAULT_PLAYER_CLIENTS) {
+  if (!playerClients) return [];
+  return ['--extractor-args', `youtube:player_client=${playerClients}`];
+}
+
+// 자막이 아예 없는 영상은 클라이언트를 바꿔도 결과가 같다. 이 안내가 나오면 재시도를 멈춘다.
+function isMissingSubtitleNotice(line) {
+  return /no subtitles for the requested languages|there are no subtitles|subtitles are not available/i.test(String(line));
+}
+
+// yt-dlp 는 실패 이유를 "ERROR: [youtube] id: ..." 형태로 내보낸다. 사용자에게 보여 줄 문장만 남긴다.
+function reasonFrom(line) {
+  return String(line)
+    .replace(/^yt-dlp\s+(?:종료 코드 \d+|시간 초과 \([^)]*\)|실행 실패):\s*/i, '')
+    .replace(/^\[(?:info|warning|error)\]\s*/i, '')
+    .replace(/^(?:ERROR|WARNING):\s*/i, '')
+    .replace(/^\[youtube\]\s*[A-Za-z0-9_-]{6,}:\s*/i, '')
+    .replace(/^\[youtube\]\s*/i, '')
+    .trim();
+}
+
+// yt-dlp 문구를 사용자가 바로 이해할 수 있는 한국어로 바꾼다. 모르는 문구는 그대로 둔다.
+const REASON_HINTS = [
+  [/this video is not available|video unavailable|has been removed|private video|members-only/i,
+    'YouTube 가 이 동영상을 제공하지 않습니다(비공개·삭제·지역 제한 등).'],
+  [/sign in to confirm|not a bot/i,
+    'YouTube 가 자동 요청을 차단했습니다. 잠시 후 다시 시도해 주세요.'],
+  [/requested format is not available|only images are available/i,
+    '이 동영상은 자막만 따로 받을 수 없습니다.'],
+  [/no supported javascript runtime|js runtime|nsig/i,
+    'yt-dlp 실행 환경(JS 런타임) 문제로 요청 서명을 풀지 못했습니다.'],
+];
+
+function friendlyReason(text) {
+  const value = String(text ?? '').trim();
+  if (!value) return '';
+  for (const [pattern, hint] of REASON_HINTS) {
+    if (pattern.test(value)) return hint;
+  }
+  return value;
+}
+
 async function downloadSubtitleFiles(videoUrl, options) {
   const { exePath, outDir, langs, timeoutMs, signal, onProgress } = options;
   fs.mkdirSync(outDir, { recursive: true });
   const before = new Set(fs.readdirSync(outDir));
+  if (onProgress) onProgress({ phase: 'subtitle', message: '자막을 내려받는 중입니다.' });
   const args = [
+    ...playerClientArgs(options.playerClients),
+    IGNORE_NO_FORMATS,
     '--skip-download',
     '--write-subs',
     '--write-auto-subs',
@@ -139,26 +197,82 @@ async function downloadSubtitleFiles(videoUrl, options) {
     '-o', path.join(outDir, '%(id)s.%(ext)s'),
     videoUrl,
   ];
-  await manager.run(exePath, args, {
-    timeoutMs,
-    signal,
-    onLine: (line) => {
-      if (/WARNING|ERROR/i.test(line)) return;
-      if (onProgress) onProgress({ phase: 'subtitle', message: '자막을 내려받는 중입니다.' });
-    },
-  });
-  return fs.readdirSync(outDir).filter((file) => !before.has(file));
+  const reasons = [];
+  let missing = false;
+  let failed = false;
+  try {
+    await manager.run(exePath, args, {
+      timeoutMs,
+      signal,
+      onLine: (line) => {
+        if (isMissingSubtitleNotice(line)) {
+          missing = true;
+          return;
+        }
+        if (/WARNING|ERROR/i.test(line)) {
+          reasons.push(reasonFrom(line));
+          return;
+        }
+        if (onProgress) onProgress({ phase: 'subtitle', message: '자막을 내려받는 중입니다.' });
+      },
+    });
+  } catch (error) {
+    // 사용자가 취소한 경우만 그대로 올린다. 그 밖의 실패는 "이 클라이언트로는 안 됐다" 로 보고
+    // 다음 클라이언트·언어 패턴을 계속 시도한다(예전에는 여기서 전체 시도가 통째로 중단됐다).
+    if (error.code === 'CANCELLED') throw error;
+    failed = true;
+    reasons.push(reasonFrom(error.message));
+  }
+  const files = fs.readdirSync(outDir).filter((file) => !before.has(file));
+  return { files, reasons, missing, failed };
 }
 
 async function fetchSubtitles(videoUrl, options = {}) {
   const { exePath, outDir, timeoutMs = 180000, signal, onProgress } = options;
-  const attempts = options.langs ? [options.langs] : LANG_ATTEMPTS;
+  const langAttempts = options.langs ? [options.langs] : LANG_ATTEMPTS;
+  const clientAttempts = options.playerClients ? [options.playerClients] : PLAYER_CLIENT_ATTEMPTS;
+  const reasons = [];
   let created = [];
-  for (const langs of attempts) {
-    created = await downloadSubtitleFiles(videoUrl, { exePath, outDir, langs, timeoutMs, signal, onProgress });
+  let missing = false;
+  for (const playerClients of clientAttempts) {
+    let missingAll = true;
+    for (const langs of langAttempts) {
+      let attempt;
+      try {
+        attempt = await downloadSubtitleFiles(videoUrl, {
+          exePath, outDir, langs, playerClients, timeoutMs, signal, onProgress,
+        });
+      } catch (error) {
+        if (error.code === 'CANCELLED') throw error;
+        reasons.push(reasonFrom(error.message));
+        missingAll = false;
+        continue;
+      }
+      reasons.push(...attempt.reasons);
+      if (attempt.files.length) {
+        created = attempt.files;
+        break;
+      }
+      if (!attempt.missing) missingAll = false;
+    }
     if (created.length) break;
+    // 모든 언어 패턴이 "요청한 언어의 자막이 없다" 였다면 클라이언트를 바꿔도 소용없다.
+    if (missingAll) {
+      missing = true;
+      break;
+    }
   }
-  if (!created.length) throw new Error('yt-dlp 가 자막 파일을 만들지 못했습니다. 자막이 없는 동영상일 수 있습니다.');
+  if (!created.length) {
+    // 이유는 중복을 없애고, 아는 문구는 한국어 안내로 바꿔 2줄까지만 보여 준다.
+    const candidates = [...new Set(reasons.filter(Boolean))];
+    const detail = [...new Set(candidates.map(friendlyReason).filter(Boolean))].slice(0, 2).join(' / ');
+    const error = new Error(missing
+      ? `이 동영상에는 영어 자막이 없습니다.${detail ? ` (${detail})` : ''}`
+      : `자막을 가져오지 못했습니다.${detail ? ` (${detail})` : ' 자막이 없는 동영상일 수 있습니다.'}`);
+    error.code = missing ? 'NO_SUBTITLES' : 'SUBTITLE_DOWNLOAD_FAILED';
+    error.detail = candidates.slice(0, 3).join(' / ');
+    throw error;
+  }
   const videoId = created[0].split('.')[0];
   const picked = pickSubtitleFile(created, videoId);
   if (!picked) throw new Error('사용할 수 있는 자막 파일을 찾지 못했습니다.');
@@ -175,4 +289,8 @@ async function fetchSubtitles(videoUrl, options = {}) {
   };
 }
 
-module.exports = { listVideos, getVideo, fetchSubtitles, parseDumpLines, toVideo };
+module.exports = {
+  listVideos, getVideo, fetchSubtitles, parseDumpLines, toVideo,
+  DEFAULT_PLAYER_CLIENTS, PLAYER_CLIENT_ATTEMPTS, playerClientArgs, isMissingSubtitleNotice,
+  IGNORE_NO_FORMATS, reasonFrom, friendlyReason,
+};

@@ -319,12 +319,14 @@ async function runSyncChannel(options, partial, signal) {
   const synced = channelsDb.touchSync(channelRow.pk);
   clearJobDir(jobId);
   const keptNote = partial.keptCount > 0 ? ` · 기존 ${partial.keptCount}개 정보 유지` : '';
+  // 자막을 못 받은 편이 있으면 개수를 결과 문장에 남긴다(화면에서 바로 보이도록).
+  const failNote = failures.length ? ` · 자막 실패 ${failures.length}개` : '';
   emit(onProgress, {
     jobId,
     phase: 'done',
     done: savedVideos.length,
     total: savedVideos.length,
-    message: `동영상 ${savedVideos.length}개(신규 ${partial.addedCount}개)${keptNote} · 자막 ${partial.transcriptCount}개 저장`,
+    message: `동영상 ${savedVideos.length}개(신규 ${partial.addedCount}개)${keptNote} · 자막 ${partial.transcriptCount}개 저장${failNote}`,
   });
   return {
     provider,

@@ -315,3 +315,28 @@
 1. **모달은 명시적으로만 닫는다**: 배경 클릭은 오조작을 유발하므로 ✕·취소·Esc 만 남긴다.
 2. **안내 문구로 덮지 않는다**: 데이터가 부실하면 화면에 경고를 띄우는 대신, 표시 규칙(영어 구문 + 한국어 뜻)을 카드 자체가 지키게 한다.
 3. **화면은 한 가지 규칙**: 저장된 분석은 어디서 보든 `문장 해석` + `구문 분석` 두 섹션만 나온다(문장 패널 제외, `head` 기본값은 유지).
+
+## 21차 라운드 계획 — @BlueyOfficialChannel 자막 수집 실패
+
+1. `main/collect/ytdlp-provider.js`: player client 상수·헬퍼 추가, 자막 다운로드에 클라이언트 인자 + 실패 이유 수집, `fetchSubtitles()` 2중 시도 + 오류 코드, `listVideos()`/`getVideo()` 도 동일 인자.
+2. `main/collect/index.js`: 완료 메시지에 자막 실패 개수.
+3. `renderer/js/views/channels.js`: 토스트·행 상태·진행 표시에 실패 개수/이유.
+4. `test/collect-player-client.test.js`: 신규 6건.
+5. 검증: `node --check` → `npm test` → `npm run smoke` → 실채널 probe.
+6. 기록: `03_task_board.md`(T61~T63) · `04_file_map.md` · `05_edit_plan.md` · `06_implementation_spec.md` · `07_validation.md` · `08_error_log.md` · `99_decisions.md`(D-039)
+
+### 설계 원칙
+
+1. **차단은 클라이언트 교체로 푼다**: 같은 영상도 어떤 player client 로 요청하느냐에 따라 거절/허용이 갈린다. 기본값을 `default,android` 로 두고, 그래도 파일이 없으면 `android,ios` 로 한 번 더 간다.
+2. **"자막 없음"과 "차단"을 구분한다**: `no subtitles for the requested languages` 안내는 클라이언트를 바꿔도 결과가 같다. 이 경우만 `NO_SUBTITLES`, 나머지는 `SUBTITLE_DOWNLOAD_FAILED`.
+3. **실패를 조용히 넘기지 않는다**: 실패 개수와 이유 한 줄을 채널 화면에 그대로 보여 준다. 조용한 실패가 이번 문제를 오래 숨겼다.
+
+### 21차 라운드 추가 계획 (T64~T66)
+
+1. `main/collect/ytdlp-provider.js`: `IGNORE_NO_FORMATS` 상수 + 자막/메타 인자에 추가, `downloadSubtitleFiles` 예외 처리, `fetchSubtitles` 재시도 유지, `reasonFrom`/`friendlyReason`/`error.detail`.
+2. `test/collect-player-client.test.js`: 스텁에 `step.throw`/`step.code` 지원 + 신규 5건.
+3. 검증: `node --check` → `npm test` → `npm run smoke` → 실영상 probe(JXvS4VIE0S0).
+4. 기록: `_workspace` 7개 파일 이어쓰기.
+5. 앱 반영: 사용자가 앱을 종료하면 v1.0.2 로 재빌드·릴리스.
+
+- **교훈**: 20차에서 릴리스한 v1.0.1 패키지에는 이후 소스 수정이 들어 있지 않다. 수집 로직을 고쳤는데도 사용자가 "그대로다" 라고 하면 **먼저 실행 중인 exe 가 패키지인지 확인**한다.

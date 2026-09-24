@@ -1,6 +1,6 @@
 {
   "name": "study-ted",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "YouTube videos + OpenRouter AI desktop app for English study (Electron + SQLite)",
   "author": "StudyTED",

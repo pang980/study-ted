@@ -816,3 +816,22 @@ npm run dist      # node scripts/prepare-bin.js && electron-builder --win && nod
 - 피드 실측(`Invoke-RestMethod releases/latest/download/latest.json`) → `feed version: 1.0.1` / `url: StudyTED-Setup-1.0.1.exe` (`releases/latest` 가 v1.0.1 을 가리킴).
 - `git push origin main` → `b777f18..ec82f14  main -> main`(PowerShell 은 stderr 를 오류로 표시하지만 성공) · `git ls-remote origin main` = `ec82f141511b60cd0392e4a3748f27b695e5cc29` (로컬 HEAD 와 일치).
 - 기존 기능 회귀 없음: 19차 기준 `npm test` 82/82 · `npm run smoke` 101 확인 / 실패 0 (이번 라운드는 빌드·배포만 수행, 코드 변경 없음).
+
+## 21차 라운드 검증 (2026-09-24) — @BlueyOfficialChannel 자막 수집
+
+- `node --check` → `main/collect/ytdlp-provider.js`, `main/collect/index.js`, `renderer/js/views/channels.js`, `test/collect-player-client.test.js` 4파일 모두 오류 없음.
+- `npm test` → **tests 88 / pass 88 / fail 0**(기존 82 + 신규 6).
+- `npm run smoke`(`ELECTRON_RUN_AS_NODE` 해제 후) → **총 101개 확인 / 실패 0개**. 채널 화면 관련 기존 항목 회귀 없음.
+- 실채널 probe(`_tmp/probe21c.js`): `@BlueyOfficialChannel` 목록 5개(`mNt8QH-fyyY, 48Up6Z2WJOQ, rX0NbuympHQ …`) + 첫 영상 자막 **478줄 / 6.4s / lang=en** 성공. 수정 전에는 같은 경로가 `ERROR: This video is not available` 로 자막 0개였다.
+- 자막 없음 경로(`_tmp/probe21b.js`, `langs: 'zz'`) → `NO_SUBTITLES :: 이 동영상에는 영어 자막이 없습니다.` 로 구분 확인.
+- TED 채널 교차 확인(`8jPQjjsBbIc`, 260줄/12s) 정상 — 다른 채널 회귀 없음.
+- 앱 실사용(채널 화면에서 자막 가져오기) 확인은 사용자 몫이며, 같은 코드 경로를 probe 로 우선 확인했다.
+
+### 21차 라운드 추가 검증 (2026-09-24)
+
+- 재현: 사용자 보고 문구가 `dist\win-unpacked\StudyTED.exe`(v1.0.1 asar) 실행에서 나온 것임을 프로세스 경로로 확인. 같은 영상 `JXvS4VIE0S0` 를 클라이언트별로 실측 → `(기본)` exit 1 `This video is not available` / `default,android` exit 0.
+- `node --check` → `main/collect/ytdlp-provider.js`, `test/collect-player-client.test.js` 통과.
+- `npm test` → **tests 93 / pass 93 / fail 0**.
+- `npm run smoke` → **총 101개 확인 / 실패 0개**.
+- probe(`_tmp/probe23.js`): `JXvS4VIE0S0` 자막 14줄/5.4s + 메타 OK · `mNt8QH-fyyY` 478줄/5.1s · TED `8jPQjjsBbIc` 260줄/11.4s.
+- 클라이언트 실측(`_tmp/clients21.js`, `_tmp/clients21b.js`): `--ignore-no-formats-error` 없이 ios/tv/web/mweb/web_safari 는 exit 1, 붙이면 모두 exit 0(ios 는 자막 2파일).

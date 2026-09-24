@@ -636,3 +636,38 @@ print  업데이트 주소(피드 URL)
 - `VIEW_PROBES.notes` 에 `warnBoxes`(`.data-table .analysis__warn`), `headRows`(`.data-table tbody tr.is-detail .analysis__head`), `aiButtons`(`.data-table .btn--ai`) 추가.
 - `view:notes 안내·재분석 버튼 없음`: 세 값이 모두 0.
 - `view:notes 편집 창 배경 클릭 유지·Esc 닫기`(삭제 동작 확인 뒤): `수정` 버튼으로 창을 열고 배경에 `MouseEvent('click')` 를 보내 **닫히지 않아야** 하고, `document` 에 `KeyboardEvent('keydown', { key: 'Escape' })` 를 보내면 닫혀야 한다.
+
+## 21차 라운드 구현 명세 — @BlueyOfficialChannel 자막 수집 실패
+
+### 1. `main/collect/ytdlp-provider.js`
+
+- 상수: `DEFAULT_PLAYER_CLIENTS = 'default,android'`, `PLAYER_CLIENT_ATTEMPTS = [DEFAULT_PLAYER_CLIENTS, 'android,ios']`.
+- `playerClientArgs(playerClients = DEFAULT_PLAYER_CLIENTS)` → `['--extractor-args', 'youtube:player_client=' + playerClients]`(빈 값이면 `[]`).
+- `isMissingSubtitleNotice(line)`: `/no subtitles for the requested languages|there are no subtitles|subtitles are not available/i`.
+- `reasonFrom(line)`: `[info|warning|error]` / `ERROR:` / `WARNING:` 접두어 제거.
+- `downloadSubtitleFiles()`: 인자 맨 앞에 `playerClientArgs(options.playerClients)`, 시작 시 진행 메시지 1회, ERROR/WARNING 줄은 `reasons` 로 수집, "자막 없음" 안내면 `missing = true`. 반환 `{ files, reasons, missing }`.
+- `fetchSubtitles()`: `clientAttempts`(기본 2종) × `langAttempts`(`en`, `en.*,en`) 2중 루프. 파일이 생기면 즉시 성공. 한 클라이언트에서 모든 언어 패턴이 `missing` 이면 클라이언트 교체 없이 종료. 실패 시 중복 제거한 이유 1~2줄을 메시지에 넣고 `error.code = missing ? 'NO_SUBTITLES' : 'SUBTITLE_DOWNLOAD_FAILED'`.
+- `listVideos()` / `getVideo()`: 인자 맨 앞에 `playerClientArgs(options.playerClients)`.
+- exports 에 `DEFAULT_PLAYER_CLIENTS, PLAYER_CLIENT_ATTEMPTS, playerClientArgs, isMissingSubtitleNotice` 추가.
+
+### 2. `main/collect/index.js`
+
+- `runSyncChannel` 완료 메시지: `failures.length` 가 있으면 `· 자막 실패 N개` 를 덧붙인다.
+
+### 3. `renderer/js/views/channels.js`
+
+- `sync()` 결과 토스트: `result.failures.length` 를 `자막 실패 N개` 로 넣고, 있으면 type `warn` + 첫 실패 메시지를 `예: <이유>` 로 한 번 더 토스트.
+- `collectChannels()`: `totals.subtitleFailed` 추가, 채널별 행 상태에 `· 자막 실패 N개`, 전체 완료 progress/toast 에도 반영하고 warn 여부에 포함.
+
+### 4. `test/collect-player-client.test.js` (신규)
+
+- `ytdlp-manager` 를 require.cache 스텁으로 바꿔 6건 검증: ① 인자 순서 ② `isMissingSubtitleNotice` 구분 ③ list/getVideo 동일 인자 ④ 클라이언트 폴백 재시도(`runs[0]`=`default,android` / `runs[2]`=`android,ios`) ⑤ 자막 없음 → `NO_SUBTITLES` + 실행 2회 ⑥ 전부 실패 → `SUBTITLE_DOWNLOAD_FAILED` + 이유 포함 + 실행 4회.
+
+### 21차 라운드 추가 구현 명세 (T64~T66)
+
+- `IGNORE_NO_FORMATS = '--ignore-no-formats-error'` — `downloadSubtitleFiles()` 와 `getVideo()` 인자에 추가.
+- `reasonFrom()`: `yt-dlp 종료 코드 N:` / `ERROR:` / `[youtube] <id>:` 접두어까지 제거해 사람이 읽는 문장만 남긴다.
+- `friendlyReason()`: `REASON_HINTS` 4종(제공 불가·봇 차단·포맷 없음·JS 런타임)으로 한국어 안내로 변환, 모르는 문구는 그대로.
+- `downloadSubtitleFiles()`: `manager.run` 을 try/catch 로 감싸고 `CANCELLED` 만 재던짐. 반환에 `failed` 추가.
+- `fetchSubtitles()`: 각 시도를 try/catch 로 감싸 실패 시 `reasons` 에 이유를 넣고 `missingAll=false` 로 다음 조합 진행. 최종 오류 메시지는 `friendlyReason` 적용본 2줄, `error.detail` 에 원문 3줄.
+- 테스트 스텁: `state.script` 단계에 `{ throw: 'message', code: 'CANCELLED' }` 지원 추가.

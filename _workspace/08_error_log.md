@@ -149,3 +149,20 @@
 
 - 도구 오류(앱 코드 아님): 패치 스크립트의 `cutRange()` 가 **끝 앵커까지 함께 잘라내는** 구현이어서 `analysis-card.js` 의 `card.append(section(1,` 접두어가 사라졌다(` '문장 해석', [h(...)]));` 만 남음). 다음 패치에서 접두어를 복원해 해결했고, 이후 `node --check`·`npm test`·`npm run smoke` 로 확인했다.
 - 주의: 패치 스크립트는 `String.prototype.indexOf` 로 **1회 매치**를 확인하고, 부분 삭제는 "시작 앵커부터 끝 앵커 **직전**까지" 를 자르는 형태로 쓴다(끝 앵커는 유지).
+
+## 21차 라운드
+
+| 날짜 | 영역 | 증상 | 원인 | 조치 |
+|---|---|---|---|---|
+| 2026-09-24 | 수집(yt-dlp) | Bluey 채널에서 자막 가져오기를 해도 자막 0개 | yt-dlp 2026.08.19 기본 player client(visionos)가 해당 영상을 `This video is not available` 로 거절. 같은 영상이 `player_client=android` 로는 정상 조회·자막 수신 | 자막 인자에 `youtube:player_client=default,android` 선행, 실패 시 `android,ios` 재시도(D-039) |
+| 2026-09-24 | 수집(native) | yt-dlp 경로가 죽으면 native 로 폴백해 `CAPTION_BLOCKED` | 내장 자막 방식은 YouTube 가 본문 전송을 거부 | yt-dlp 경로를 복구해 `provider: auto` 선택이 yt-dlp 를 쓰게 함(코드 변경 없음, 진단 기록) |
+| 2026-09-24 | 수집(UX) | 자막이 왜 안 왔는지 화면에 안 보임(실패 개수만) | `home.js` 만 toast 하고 실패 이유를 전달하지 않았다 | 완료 메시지·채널 토스트·행 상태에 실패 개수 + `예: <이유>` 노출 |
+| 2026-09-24 | 검증(probe) | 자막이 없으면 성공(exit 0)과 차단이 구분되지 않음 | `[info] There are no subtitles for the requested languages` 도 exit code 0 | stdout 안내 줄을 `missing` 으로 분류해 `NO_SUBTITLES` 코드로 분리 |
+
+### 21차 라운드 추가
+
+| 날짜 | 영역 | 증상 | 원인 | 조치 |
+|---|---|---|---|---|
+| 2026-09-24 | 배포/실행 | 소스에서 고친 뒤에도 사용자 앱은 같은 오류(`yt-dlp 종료 코드 1 … This video is not available`) | 사용자가 `dist\win-unpacked\StudyTED.exe`(v1.0.1 패키지)를 실행 중이라 asar 에 수정이 없었다 | 패키지 빌드는 재빌드가 필요하다는 것을 확인, v1.0.2 릴리스로 전달 |
+| 2026-09-24 | 수집(yt-dlp) | yt-dlp 가 exit≠0 이면 클라이언트 폴백이 아예 동작하지 않음 | `downloadSubtitleFiles` 의 `manager.run` 예외가 `fetchSubtitles` 밖으로 그대로 올라갔다 | 예외를 잡아 이유만 모으고 다음 조합을 계속 시도(취소만 재던짐) |
+| 2026-09-24 | 수집(yt-dlp) | 자막만 받는데도 `Requested format is not available` 로 실패 | `--skip-download` 여도 yt-dlp 는 포맷을 고른다 | `--ignore-no-formats-error` 추가 |

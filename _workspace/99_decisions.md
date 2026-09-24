@@ -287,3 +287,22 @@
 - 결정 3(피드는 `latest`): 앱에 내장한 기본 업데이트 주소는 태그 고정 주소가 아니라 `releases/latest/download/latest.json` 이다. 그래야 다음 릴리스에서도 사용자가 설정을 바꾸지 않아도 자동 확인이 동작한다(실측으로 `1.0.1` 확인).
 - 근거: 배포 단계를 손으로 나누면 "빌드는 했는데 자산을 안 올림", "태그만 있고 자산이 없음" 같은 어긋남이 생긴다. 스크립트가 산출물·자산·피드를 한 번에 검사하고, 배포 뒤 커밋을 남기는 순서가 저장소 이력과 실제 배포 상태를 일치시킨다.
 - 영향: 앞으로 버전을 올릴 때도 `build/release-notes.md` 만 고치고 `npm version` → `npm run release` → `git push` 세 단계면 된다. 사용자는 홈 상단 배지에서 업데이트 확인 후 바로 설치할 수 있다.
+
+## D-039. 자막 수집은 player client 를 `default` → `android` 로 폴백하고, 실패 이유를 화면에 노출한다
+
+- 배경: 사용자가 `@BlueyOfficialChannel` 에서 자막 가져오기를 눌러도 자막이 0개였다. 진단 결과 yt-dlp 2026.08.19 의 기본 player client(visionos)가 해당 영상들을 `ERROR: This video is not available` 로 거절했고, 같은 영상이 `player_client=android` 로는 정상 조회·자막 수신됐다.
+- 결정 1(클라이언트 순서): `listVideos`/`getVideo`/`fetchSubtitles` 모두 `--extractor-args youtube:player_client=default,android` 를 기본으로 쓰고, 자막 파일이 하나도 안 생기면 `android,ios` 로 한 번 더 시도한다. `web`/`mweb`/`tv` 단독은 실패했다.
+- 결정 2(자막 없음 구분): `no subtitles for the requested languages` 안내가 나오면 클라이언트를 바꿔도 결과가 같으므로 즉시 중단하고 `NO_SUBTITLES` 코드를 준다. 그 외는 `SUBTITLE_DOWNLOAD_FAILED` + 이유 1~2줄.
+- 결정 3(실패 노출): 실패 개수와 첫 이유를 채널 화면(토스트·행 상태·진행 표시)에 그대로 보여 준다. 조용한 실패가 이번 문제를 오래 숨겼다.
+- 근거: 차단은 앱 로직이 아니라 YouTube 쪽 클라이언트 정책 문제다. 재시도로 우회하고, 그래도 안 되면 사용자가 이유를 알 수 있어야 한다.
+- 영향: 새로 추가하는 채널도 자막 수집이 같은 경로를 타므로 이번 수정이 함께 적용된다. yt-dlp 를 올릴 때 `PLAYER_CLIENT_ATTEMPTS` 를 다시 확인한다.
+
+## D-040. 자막 수집은 포맷 오류를 무시하고, 실패해도 클라이언트 폴백을 끝까지 돌린 뒤 한국어로 이유를 보여 준다
+
+- 배경: T61~T63 로 player client 폴백을 넣었는데도 사용자 앱에서 `yt-dlp 종료 코드 1: ERROR: [youtube] JXvS4VIE0S0: This video is not available` 가 다시 보고됐다. 확인 결과 ① 사용자가 실행한 것은 v1.0.1 패키지 빌드라 수정이 없었고 ② 소스에도 "exit≠0 이면 폴백 전체가 중단" 되는 결함이 있었다.
+- 결정 1(포맷 오류 무시): 자막 전용 요청에도 `--ignore-no-formats-error` 를 붙인다. 자막은 재생 포맷과 무관한데 `ios`/`web`/`mweb`/`tv` 는 포맷 선택에서 죽어 자막까지 못 받았다.
+- 결정 2(폴백은 끝까지): `downloadSubtitleFiles` 가 예외를 삼켜 `failed` 로 보고하고, `fetchSubtitles` 는 취소(`CANCELLED`)가 아닌 한 클라이언트·언어 조합을 모두 시도한다. 중간 실패가 재시도를 막으면 안 된다.
+- 결정 3(이유는 한국어로, 원문은 보존): 사용자에게는 `friendlyReason` 으로 바꾼 안내를 보여 주고, 원문은 `error.detail` 에 남긴다. 사용자에게 원문은 불친절하고, 진단에는 원문이 필요하다.
+- 결정 4(패키지 앱 우선 확인): 수집 로직을 고쳤는데 증상이 그대로면 실행 중인 exe 가 `dist` 패키지인지 먼저 확인한다. 패키지 앱은 asar 를 쓰므로 소스 수정이 반영되지 않는다.
+- 근거: yt-dlp 의 실패는 (a) 클라이언트 정책 (b) 포맷 없음 (c) 자막 없음 세 가지가 섞여 있고 exit code 만으로는 구분되지 않는다. 각각을 분리해 처리해야 "자막이 없는 영상" 과 "우리가 못 받은 영상" 이 사용자에게 구분돼 보인다.
+- 영향: 자막 수집이 실패하는 영상은 이제 이유가 한국어로 표시된다. 수정을 사용자에게 전달하려면 릴리스(v1.0.2)가 필요하다.

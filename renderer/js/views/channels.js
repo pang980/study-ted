@@ -196,7 +196,14 @@ export function createChannelsView({ onNavigate } = {}) {
       if (result.addedCount !== undefined) parts.push(`신규 ${result.addedCount}개`);
       if (result.keptCount) parts.push(`기존 ${result.keptCount}개 유지`);
       if (result.transcriptCount) parts.push(`자막 ${result.transcriptCount}개`);
-      toast(`채널을 불러왔습니다. (${parts.join(' · ')})`, { type: 'success', timeout: 5000 });
+      const failed = Number(result.failures?.length) || 0;
+      if (failed) parts.push(`자막 실패 ${failed}개`);
+      toast(`채널을 불러왔습니다. (${parts.join(' · ')})`, { type: failed ? 'warn' : 'success', timeout: 5000 });
+      if (failed) {
+        // 왜 못 받았는지 한 줄로 알려 준다(대개 YouTube 가 막은 경우다).
+        const reason = result.failures[0]?.message ?? '';
+        toast(`자막을 가져오지 못한 동영상이 ${failed}개 있습니다.${reason ? ` 예: ${reason}` : ''}`, { type: 'warn', timeout: 8000 });
+      }
       if (result.listWarning) toast(result.listWarning, { type: 'warn', timeout: 6000 });
       await refreshStatus();
     } catch (error) {
@@ -221,7 +228,7 @@ export function createChannelsView({ onNavigate } = {}) {
     const limit = actions.resolveCollectLimit();
     queue = { total: list.length, index: 0 };
     setBusy(true);
-    const totals = { added: 0, transcripts: 0, failed: 0 };
+    const totals = { added: 0, transcripts: 0, failed: 0, subtitleFailed: 0 };
     let cancelled = false;
     try {
       for (let i = 0; i < list.length; i += 1) {
@@ -246,9 +253,14 @@ export function createChannelsView({ onNavigate } = {}) {
           });
           const added = Number(result?.addedCount) || 0;
           const transcripts = Number(result?.transcriptCount) || 0;
+          const failedSubtitles = Number(result?.failures?.length) || 0;
           totals.added += added;
           totals.transcripts += transcripts;
-          setRowStatus(item.pk, `완료 · 신규 ${added}개 · 자막 ${transcripts}개`);
+          totals.subtitleFailed += failedSubtitles;
+          setRowStatus(
+            item.pk,
+            `완료 · 신규 ${added}개 · 자막 ${transcripts}개${failedSubtitles ? ` · 자막 실패 ${failedSubtitles}개` : ''}`,
+          );
         } catch (error) {
           if (error.code === 'CANCELLED') {
             cancelled = true;
@@ -260,12 +272,13 @@ export function createChannelsView({ onNavigate } = {}) {
         }
       }
       const suffix = cancelled ? '중단' : '완료';
-      paintProgress(1, 1, `수집 ${suffix} · 신규 ${totals.added}개 · 자막 ${totals.transcripts}개${totals.failed ? ` · 실패 ${totals.failed}개` : ''}`);
+      const failedNote = `${totals.failed ? ` · 실패 ${totals.failed}개` : ''}${totals.subtitleFailed ? ` · 자막 실패 ${totals.subtitleFailed}개` : ''}`;
+      paintProgress(1, 1, `수집 ${suffix} · 신규 ${totals.added}개 · 자막 ${totals.transcripts}개${failedNote}`);
       toast(
         cancelled
           ? '수집을 취소했습니다.'
-          : `채널 ${list.length}개 수집 완료 (신규 ${totals.added}개 · 자막 ${totals.transcripts}개)`,
-        { type: cancelled || totals.failed ? 'warn' : 'success', timeout: 6000 },
+          : `채널 ${list.length}개 수집 완료 (신규 ${totals.added}개 · 자막 ${totals.transcripts}개${failedNote})`,
+        { type: cancelled || totals.failed || totals.subtitleFailed ? 'warn' : 'success', timeout: 6000 },
       );
       await Promise.all([actions.loadChannels(), actions.loadInfo()]);
     } catch (error) {

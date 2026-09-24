@@ -310,3 +310,40 @@
 - **자산 3종**: `StudyTED-Setup-1.0.1.exe`(128,832,926 bytes) · `StudyTED-Setup-1.0.1.exe.blockmap` · `latest.json`(1,542 bytes).
 - **업데이트 피드**: https://github.com/pang980/study-ted/releases/latest/download/latest.json → `version` `1.0.1`, `url` `StudyTED-Setup-1.0.1.exe` (앱 홈 상단 버전 배지가 이 주소로 확인).
 - 사용자 요청 대응: 홈 상단 버전 표시 + 업데이트 있음 표기 + 클릭 시 다운로드·설치(Electron 피드) 경로가 v1.0.1 로 실제 동작한다.
+
+## 21차 라운드 완료 기록 (2026-09-24) — @BlueyOfficialChannel 자막 수집 실패 수정
+
+사용자 보고: `https://www.youtube.com/@BlueyOfficialChannel` 채널에서 **자막 가져오기**를 눌러도 자막을 가져오지 않는다.
+
+| 시스템 | 내용 | 상태 | 수정 파일 |
+|---|---|---|---|
+| T61 | yt-dlp player client 를 `default,android` 로 넘기고, 실패하면 `android,ios` 로 한 번 더 시도 | DONE | `main/collect/ytdlp-provider.js` |
+| T62 | 자막 다운로드 실패 이유(yt-dlp ERROR 문구)를 모아 오류 코드(`NO_SUBTITLES`/`SUBTITLE_DOWNLOAD_FAILED`)로 구분 | DONE | `main/collect/ytdlp-provider.js` |
+| T63 | 실패 개수·이유를 채널 화면(토스트·행 상태·진행 표시)에 노출 | DONE | `main/collect/index.js`, `renderer/js/views/channels.js` |
+| T61-검증 | 신규 테스트 6건(`test/collect-player-client.test.js`) + 실채널 probe | DONE | `test/collect-player-client.test.js` |
+
+- **T61(원인)**: yt-dlp 2026.08.19 의 기본 player client(visionos)가 Bluey 영상들을 `ERROR: This video is not available` 로 거절해 자막이 0개였다. 같은 영상이 `player_client=android` 로는 정상 조회·자막 수신된다(실측).
+- **T61(수정)**: 자막·목록·단일 조회 모두 `--extractor-args youtube:player_client=default,android` 를 앞에 붙이고, 자막 파일이 하나도 안 생기면 `android,ios` 로 재시도한다.
+- **T62(수정)**: `downloadSubtitleFiles()` 가 `{ files, reasons, missing }` 를 돌려주고, "요청한 언어의 자막이 없다" 안내가 뜨면 클라이언트를 바꿔도 소용없으므로 즉시 중단한다(`NO_SUBTITLES`). 그 외 실패는 `SUBTITLE_DOWNLOAD_FAILED` + 이유 1~2줄.
+- **T63(수정)**: 완료 메시지에 `· 자막 실패 N개`, 채널 행에 `완료 · 신규 N개 · 자막 N개 · 자막 실패 N개`, 실패 시 토스트에 `예: <이유>` 를 warn 으로 표시한다.
+- 검증 요약: `node --check` 4파일 OK · `npm test` **88/88**(기존 82 + 신규 6) · `npm run smoke` **101/0** · 실채널 probe 목록 5개 + 자막 478줄/6.4s 성공.
+
+### 21차 라운드 추가 수정 (T64~T66) — 사용자 앱에서 같은 증상 재보고
+
+사용자 보고: 자막 가져오기에서 `yt-dlp 종료 코드 1: ERROR: [youtube] JXvS4VIE0S0: This video is not available`.
+
+| 시스템 | 내용 | 상태 | 수정 파일 |
+|---|---|---|---|
+| T64 | 자막 요청에 `--ignore-no-formats-error` 추가(자막만 받을 때도 포맷 선택이 실패해 죽는 문제) | DONE | `main/collect/ytdlp-provider.js` |
+| T65 | yt-dlp 비정상 종료(exit≠0)에도 다음 클라이언트·언어로 계속 시도(예전엔 전체 중단) | DONE | `main/collect/ytdlp-provider.js` |
+| T66 | 실패 이유를 한국어 안내로 바꾸고(`friendlyReason`) 원문은 `error.detail` 로 남김 | DONE | `main/collect/ytdlp-provider.js` |
+| T66-검증 | 신규 테스트 5건 추가(총 93) · 실영상 probe(JXvS4VIE0S0 포함 3편) | DONE | `test/collect-player-client.test.js` |
+
+- **원인(진짜) 2가지**
+  1. 사용자가 실행 중인 앱은 `dist\win-unpacked\StudyTED.exe`(v1.0.1 패키지)이라 **T61~T63 수정이 asar 에 들어 있지 않았다**. 그래서 여전히 기본 player client 로 요청해 `This video is not available` 가 났다(실측: `default,android` 로는 같은 영상이 exit 0, 자막 14줄 수신).
+  2. 소스에도 결함이 하나 있었다. `manager.run` 이 exit≠0 으로 reject 하면 `fetchSubtitles` 가 그대로 예외를 올려 **다음 클라이언트/언어 재시도를 통째로 건너뛰었다**(T65).
+- **T64(수정)**: 자막 전용 요청도 yt-dlp 는 재생 포맷을 고른다. `ios`/`web`/`mweb`/`tv` 는 `Requested format is not available` 로 죽었는데, `--ignore-no-formats-error` 하나로 모두 exit 0 이 되고 `ios` 는 자막까지 받아진다(실측).
+- **T65(수정)**: `downloadSubtitleFiles()` 가 예외를 잡아 `{ files, reasons, missing, failed }` 로 돌려주고, 취소(`CANCELLED`)만 그대로 올린다. 실패해도 다음 조합을 계속 시도한다.
+- **T66(수정)**: `This video is not available` → "YouTube 가 이 동영상을 제공하지 않습니다(비공개·삭제·지역 제한 등)." 처럼 아는 문구를 한국어로 바꾼다. 원문은 `error.detail` 에 남겨 진단에 쓴다.
+- 검증 요약: `npm test` **93/93**(88 + 신규 5) · `npm run smoke` **101/0** · probe `JXvS4VIE0S0` 자막 14줄/5.4s + 메타 정상, `mNt8QH-fyyY` 478줄, TED `8jPQjjsBbIc` 260줄.
+- **사용자 앱 반영에는 재빌드가 필요하다**(패키지 앱은 소스 수정을 읽지 않음). v1.0.2 릴리스 후 홈 상단 배지에서 업데이트하면 적용된다.

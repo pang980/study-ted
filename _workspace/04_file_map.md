@@ -433,3 +433,23 @@
 | `scripts/smoke.js` | notes 프로브에 `warnBoxes`/`headRows`/`aiButtons` 추가, `view:notes 안내·재분석 버튼 없음`·`view:notes 편집 창 배경 클릭 유지·Esc 닫기` 확인 추가 | 새 UI 규칙 회귀 방지 |
 
 - 새로 만든 파일 없음(전부 기존 파일 수정).
+
+### 21차 라운드 (T61~T63)
+
+| 파일 | 변경 | 이유 |
+|---|---|---|
+| `main/collect/ytdlp-provider.js` | `DEFAULT_PLAYER_CLIENTS`/`PLAYER_CLIENT_ATTEMPTS`/`playerClientArgs()`/`isMissingSubtitleNotice()`/`reasonFrom()` 추가, `downloadSubtitleFiles()` 반환 `{ files, reasons, missing }`, `fetchSubtitles()` 클라이언트×언어 2중 시도 + 오류 코드, `listVideos()`/`getVideo()` 인자 앞에 클라이언트 지정, exports 확장 | 기본 player client 가 Bluey 영상 조회를 거절해 자막이 0개였다(D-039) |
+| `main/collect/index.js` | 채널 동기화 완료 메시지에 `· 자막 실패 N개` 추가 | 실패를 화면에서 바로 보이게 |
+| `renderer/js/views/channels.js` | `sync()` 토스트에 `자막 실패 N개` + `예: <이유>`(warn), 채널별 `totals.subtitleFailed`, 행 상태·전체 완료 progress/toast 반영 | 실패 이유가 사용자에게 안 보였다 |
+| `test/collect-player-client.test.js` | 신규 6건 — 인자 순서·자막 없음 구분·list/getVideo 동일 인자·클라이언트 폴백·오류 코드 | 회귀 방지 |
+
+- 새 파일 1개(`test/collect-player-client.test.js`), 나머지는 기존 파일 수정.
+
+### 21차 라운드 2차분 (T64~T66)
+
+| 파일 | 변경 | 이유 |
+|---|---|---|
+| `main/collect/ytdlp-provider.js` | `IGNORE_NO_FORMATS = '--ignore-no-formats-error'` 상수 → `downloadSubtitleFiles()`·`getVideo()` 인자에 추가, `downloadSubtitleFiles()` 를 try/catch 로 감싸 `CANCELLED` 만 재던지고 나머지는 `{ failed: true, reasons }` 로 보고, `fetchSubtitles()` 각 시도도 try/catch 로 감싸 실패해도 다음 클라이언트/언어 조합을 계속 시도, `reasonFrom()` 이 `yt-dlp 종료 코드 N:`·`ERROR:`·`[youtube] <id>:` 접두어까지 제거, `REASON_HINTS`+`friendlyReason()` 로 아는 실패 문구를 한국어 안내로 변환(`error.detail` 에 원문 보존), exports 확장 | 자막 전용 요청이 포맷 선택 오류로 죽던 문제 + 실패 이유가 그대로 노출되던 문제(D-040) |
+| `test/collect-player-client.test.js` | 스텁에 `{ throw, code }` 지원 추가, 신규 5건(포맷 무시 플래그 전달·exit≠0 폴백 유지·전부 실패 시 한국어 안내·취소 즉시 종료·`reasonFrom`/`friendlyReason`) 추가 | 회귀 방지 |
+
+- 새 파일 없음(21차 1차분에서 만든 	est/collect-player-client.test.js 에 5건 추가, main/collect/ytdlp-provider.js 확장).
