@@ -835,3 +835,14 @@ npm run dist      # node scripts/prepare-bin.js && electron-builder --win && nod
 - `npm run smoke` → **총 101개 확인 / 실패 0개**.
 - probe(`_tmp/probe23.js`): `JXvS4VIE0S0` 자막 14줄/5.4s + 메타 OK · `mNt8QH-fyyY` 478줄/5.1s · TED `8jPQjjsBbIc` 260줄/11.4s.
 - 클라이언트 실측(`_tmp/clients21.js`, `_tmp/clients21b.js`): `--ignore-no-formats-error` 없이 ios/tv/web/mweb/web_safari 는 exit 1, 붙이면 모두 exit 0(ios 는 자막 2파일).
+
+## 21차 라운드 배포 검증 (2026-09-24) — v1.0.2
+
+- 사전 조건: `Get-Process StudyTED` = 0 (앱 종료 확인), `ELECTRON_RUN_AS_NODE` 해제 후 실행.
+- `npm run release` 종료 코드 **0** → 릴리스 https://github.com/pang980/study-ted/releases/tag/v1.0.2 (`StudyTED v1.0.2`).
+- `gh release view v1.0.2` → 자산 3종 `state=uploaded`, `StudyTED-Setup-1.0.2.exe` digest `sha256:67d555824adabc8d…` (로컬 `Get-FileHash` 와 일치).
+- 피드 실측(`releases/latest/download/latest.json`) → `version` `1.0.2` · `url` `StudyTED-Setup-1.0.2.exe` · `size` 128,834,738 · `sha256` 일치.
+- asar 검증: `--ignore-no-formats-error` true · `youtube:player_client=` true · `android,ios` true · `friendlyReason` true · `NO_SUBTITLES` true.
+- `git push origin main` → `6a69bb1..bb5e60a` · `git ls-remote origin main` = `bb5e60aa851bc3bc83d0ff2ed98a207427f35005` (로컬 HEAD 와 일치).
+- 코드 회귀 없음: `npm test` **93/93** · `npm run smoke` **101 확인 / 실패 0** (배포 후 재확인).
+- 사용자 앱 실사용 확인은 사용자 몫(설치 후 채널 화면에서 수집 재실행).

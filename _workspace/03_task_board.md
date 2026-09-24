@@ -347,3 +347,22 @@
 - **T66(수정)**: `This video is not available` → "YouTube 가 이 동영상을 제공하지 않습니다(비공개·삭제·지역 제한 등)." 처럼 아는 문구를 한국어로 바꾼다. 원문은 `error.detail` 에 남겨 진단에 쓴다.
 - 검증 요약: `npm test` **93/93**(88 + 신규 5) · `npm run smoke` **101/0** · probe `JXvS4VIE0S0` 자막 14줄/5.4s + 메타 정상, `mNt8QH-fyyY` 478줄, TED `8jPQjjsBbIc` 260줄.
 - **사용자 앱 반영에는 재빌드가 필요하다**(패키지 앱은 소스 수정을 읽지 않음). v1.0.2 릴리스 후 홈 상단 배지에서 업데이트하면 적용된다.
+
+## 21차 라운드 배포 기록 (2026-09-24) — v1.0.2 릴리스
+
+T61~T66 수정을 담은 **v1.0.2** 를 GitHub Releases 에 배포하고 저장소 main 에 반영했다.
+
+| 태스크 | 내용 | 상태 | 결과 |
+|---|---|---|---|
+| T67-1 | `build/release-notes.md` 를 v1.0.2 내용으로 교체 | DONE | 릴리스 노트 v1.0.2 |
+| T67-2 | `package.json`/`package-lock.json` 버전 1.0.2 | DONE | `npm version 1.0.2 --no-git-tag-version` |
+| T67-3 | `npm run release` (dist 빌드 + 태그 + 자산 업로드) | DONE | https://github.com/pang980/study-ted/releases/tag/v1.0.2 |
+| T67-4 | 저장소 main 커밋·푸시 | DONE | `bb5e60a` (`6a69bb1..bb5e60a main -> main`) |
+| T67-5 | 릴리스 자산·업데이트 피드·asar 반영 확인 | DONE | 자산 3종 + 피드 version 1.0.2 + asar 문자열 5종 |
+
+- **빌드**: `electron-builder` 26.15.3 / electron 44.4.4 / `dist\StudyTED-Setup-1.0.2.exe` **128,834,738 bytes(122.9 MB)** / sha256 `67d555824adabc8db44140573b3ca920b57036cbe36bd20f5aaed3914300414b`.
+- **자산 3종**: `StudyTED-Setup-1.0.2.exe`(128,834,738) · `StudyTED-Setup-1.0.2.exe.blockmap`(135,452) · `latest.json`(1,650) — 모두 `state=uploaded`.
+- **업데이트 피드 실측**: https://github.com/pang980/study-ted/releases/latest/download/latest.json → `version` `1.0.2` · `url` `StudyTED-Setup-1.0.2.exe` · `sha256` 로컬 해시와 일치.
+- **asar 검증**: `dist\win-unpacked\resources\app.asar` 안에 `--ignore-no-formats-error` · `youtube:player_client=` · `android,ios` · `friendlyReason` · `NO_SUBTITLES` 5개 문자열이 모두 존재 → 이번 수정이 패키지에 실제로 들어갔다.
+- **무설치 실행 파일**: `dist\win-unpacked\StudyTED.exe` (설치 없이 바로 실행 가능).
+- 사용자 안내: 홈 상단 버전 배지에서 업데이트 확인 → 다운로드·설치·재시작하면 적용된다. 자막 실패로 비어 있던 영상은 채널 화면에서 다시 수집하면 자막 없는 영상만 새로 받는다.
