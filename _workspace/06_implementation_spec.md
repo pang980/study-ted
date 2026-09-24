@@ -546,3 +546,62 @@ print  업데이트 주소(피드 URL)
 
 - 설치된 앱은 시작 8초 후·6시간마다 피드를 확인한다. 새 버전이면 홈 배너가 `새 버전 v1.0.1 이 있습니다` 로 바뀌고 `업데이트 내려받기` → `지금 설치하고 다시 시작` 으로 갱신된다.
 - 1.0.0 → 1.0.1 처럼 `package.json` 의 `version` 만 올리면 태그·자산 이름·피드 버전이 모두 따라온다.
+
+## 18차 구현 명세 (2026-09-24)
+
+### 1. `main/ai/openrouter.js` — 분석 대상 고정
+
+- `systemPrompt(targetLang)` 마지막에 2줄 추가:
+  - `The analysis target is always the single line that starts with "Sentence:".`
+  - `A video title or surrounding context is reference only: never translate it and never analyze it instead of that sentence.`
+- `userPrompt({ sentence, context, videoTitle })` 줄 순서:
+  1. 출력 스키마 JSON
+  2. `What to analyze:` + "대상은 맨 끝 `Sentence:` 한 줄, 제목·문맥은 참고용" 2줄
+  3. `Language rules (most important):` 이하 기존 규칙
+  4. `Reference only (never translate or analyze these):` (제목 또는 문맥이 있을 때만) → `- Video title: …` → `- Surrounding context: …`
+  5. `Analysis target: the one English sentence below. …` → `Sentence: …` (**항상 마지막**)
+- `.filter(Boolean)` 유지 → 제목·문맥이 없으면 `Reference only` 헤더도 사라지고 `Sentence:` 가 곧바로 뒤따른다.
+
+### 2. `renderer/js/ui.js` — 확인 창 확정 순서
+
+    let settled = false;
+    const done = (value) => { if (settled) return; settled = true; resolve(value); };
+    확인 버튼: done(true)  → dialog.close()
+    취소 버튼: done(false) → dialog.close()
+    onClose: () => done(false)
+
+- `dialog.close()` 안에서 `onClose` 가 동기 실행되므로, `resolve` 를 **먼저** 확정해야 확인 클릭이 살아남는다.
+
+### 3. `renderer/js/components/notes-table.js` — 상세 보기
+
+- 생성자에서 `this.tableWrap = h('div', { class: 'table-wrap' }, this.table)` 을 만들어 `element` 에서 재사용한다.
+- `renderRows()` 첫 줄에서 `this.tableWrap.classList.remove('is-expanded')`.
+- 문장 셀: `class: 'cell-sentence cell-clamp is-clickable'`, `title: '눌러서 해석·구문 분석 보기'`, `onClick: () => toggleDetail()`.
+- 상세 행(`tr.is-detail`, 초기 `hidden`)을 **모든 행에** 만든다:
+
+      td[colspan=COLUMNS.length] > div.detail-body
+        > div.detail-sentence   (문장 전체)
+        > div.detail-translation (해석이 있을 때만)
+        > renderAnalysisCard(...) 또는 "저장된 AI 분석이 없습니다. …" 안내
+
+- 지역 함수: `syncExpanded()` = 열린 `tr.is-detail` 이 하나라도 있으면 `is-expanded` 토글, `toggleDetail()` = `detailRow.hidden = !detailRow.hidden` + `syncExpanded()`.
+- `분석 보기` 버튼 `onClick` 을 `toggleDetail()` 로 교체(기존엔 `hidden` 만 뒤집고 `is-expanded` 를 몰랐다).
+
+### 4. `renderer/css/views.css`
+
+    .table-wrap.is-expanded { max-height: none; }   /* 기본은 .table-wrap { max-height: 360px; overflow: auto; } */
+    .detail-body      { display:flex; flex-direction:column; gap:10px; padding:12px 2px 4px; }
+    .detail-sentence  { font-family: var(--font-en); font-weight:600; line-height:1.65; color:#1d2b41; }
+    .detail-translation { line-height:1.65; color: var(--muted); }
+    .cell-sentence.is-clickable { cursor:pointer; }
+    .cell-sentence.is-clickable:hover { color: var(--primary); text-decoration: underline; }
+
+### 5. `scripts/smoke.js` — 검증 갱신
+
+- `VIEW_PROBES.notes`: `detailRows`(모든 상세 행) 추가, `details` 는 **분석 카드가 있는** 상세 행 수로 재정의.
+- 단언: `details > 0 && detailRows === rows && cards === details && toggleButtons === details && summaries === details`.
+- 추가 검증 3건:
+  1. `view:notes 문장 클릭 상세` — 먼저 열려 있는 상세를 모두 닫고, `tr:nth-child(1) .cell-sentence` 클릭 → `hidden=false` + `is-expanded=true`, 다시 클릭 → `hidden=true` + `is-expanded=false`
+  2. `view:notes 분석 보기 높이 해제` — `분석 보기` 클릭 전 `max-height=360px` → 클릭 후 `none`, 열린 상세 본문 높이 > 40px, 다시 클릭 → `360px`
+  3. `view:notes 삭제 동작`(`runViewChecks` 뒤) — `title="삭제"` 버튼 → `.modal__foot .btn--danger` 클릭 → 행 수 4 → 3, 모달 닫힘
+- 검증 헬퍼는 `hidden` **속성**(:not([hidden]))이 아니라 **프로퍼티**로 열림 여부를 판단한다(둘은 같이 움직이지만, 값을 재는 시점이 닫힌 뒤면 0 이 되므로 열려 있을 때 측정한다).

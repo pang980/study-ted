@@ -407,3 +407,16 @@
 | `main/db/settings.js` | `DEFAULT_UPDATE_FEED_URL` 상수 신설 + `DEFAULTS['update.feedUrl']` 을 그 값으로 | 설치만 하면 자동 업데이트가 동작해야 한다(D-035). DB 행이 없을 때만 쓰이므로 사용자가 설정한 주소가 항상 우선한다 |
 | `package.json` | 스크립트 `release` 추가 | 배포 한 줄 명령 |
 | `README.md` | 명령 목록에 `npm run release`, **GitHub 릴리스로 배포 (기본 경로)** 절 신설, 주요 기능 9번에 "기본 주소 내장" 문구, 업데이트 배포 3번 단계에 기본값 안내, 폴더 구조 `scripts/` 설명에 릴리스 보조 추가 | 배포·업데이트 사용법 |
+
+### 18차 수정 파일
+
+| 파일 | 변경 | 이유 |
+|---|---|---|
+| `main/ai/openrouter.js` | `systemPrompt()` 에 "분석 대상은 `Sentence:` 한 줄" 규칙 2줄 추가, `userPrompt()` 에 `What to analyze:` 블록 추가 + 제목·문맥을 `Reference only` 블록으로 묶어 `Sentence:` 앞에서 위로 이동, `Sentence:` 를 마지막 줄로 | 약한 모델이 제목을 분석 대상으로 착각했다(D-036) |
+| `renderer/js/ui.js` | `confirmDialog()` 에 `settled`/`done(value)` 도입, 확인·취소·`onClose` 순서 정리 | `close()` → `onClose` → `resolve(false)` 가 먼저 확정돼 삭제가 항상 취소됐다(D-036) |
+| `renderer/js/components/notes-table.js` | `this.tableWrap` 승격, `renderRows` 에서 `is-expanded` 해제, 문장 셀 `is-clickable`+`onClick`, 상세 행을 모든 행에 생성(`.detail-body`/`.detail-sentence`/`.detail-translation`), `syncExpanded()`·`toggleDetail()` 추가, `분석 보기` 가 `toggleDetail()` 사용, 내보내기 다이얼로그 resolve 순서 교체 | 문장 클릭으로 상세 보기 + 펼친 내용이 잘리지 않게(D-036) |
+| `renderer/css/views.css` | `.table-wrap.is-expanded { max-height: none; }`, `.detail-body`/`.detail-sentence`/`.detail-translation`, `.cell-sentence.is-clickable`(+hover) | 높이 제한 해제와 클릭 가능 표시 |
+| `test/ai-parse.test.js` | `프롬프트가 동영상 제목이 아니라 문장 하나만 분석하라고 지시한다` 추가 | 제목 오분석 회귀 방지 |
+| `scripts/smoke.js` | `VIEW_PROBES.notes` 에 `detailRows` 추가·단언 조정, 문장 클릭 상세·분석 보기 높이 해제·삭제 동작 검증 3건 추가 | 새 동작 회귀 방지 |
+
+- 새로 만든 파일 없음(전부 기존 파일 수정).

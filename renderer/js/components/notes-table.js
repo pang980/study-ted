@@ -36,15 +36,15 @@ export async function exportSentences(scope = 'all') {
       title: '내보내기 (공유용)',
       body: h('div', { class: 'stack' }, h('p', { class: 'muted small', text: '저장할 파일 형식을 선택하면 저장 위치를 묻습니다.' }), ...radios),
       foot: [
-        h('button', { class: 'btn', type: 'button', text: '취소', onClick: () => { dialog.close(); resolve(null); } }),
+        h('button', { class: 'btn', type: 'button', text: '취소', onClick: () => { resolve(null); dialog.close(); } }),
         h('button', {
           class: 'btn btn--primary',
           type: 'button',
           text: '내보내기',
           onClick: () => {
             const picked = dialog.modal.querySelector('input[name="export-format"]:checked');
-            dialog.close();
             resolve(picked ? picked.value : 'json');
+            dialog.close();
           },
         }),
       ],
@@ -170,6 +170,9 @@ export class NotesTable {
       this.favBtn,
     );
 
+    // 상세를 펼치면 높이 제한을 풀어야 해서 감싸는 요소를 기억해 둔다.
+    this.tableWrap = h('div', { class: 'table-wrap' }, this.table);
+
     this.element = h(
       'section',
       { class: 'card' },
@@ -181,7 +184,7 @@ export class NotesTable {
         this.countLabel,
         this.exportBtn,
       ),
-      h('div', { class: 'table-wrap' }, this.table),
+      this.tableWrap,
     );
   }
 
@@ -239,6 +242,8 @@ export class NotesTable {
     const items = state.sentences.items ?? [];
     this.rows = items;
     clear(this.tbody);
+    // 행을 다시 그리면 펼친 상세도 사라지므로 높이 제한을 원래대로 돌린다.
+    this.tableWrap.classList.remove('is-expanded');
     this.countLabel.textContent = `전체 ${state.sentences.total ?? items.length}개`;
 
     if (!items.length) {
@@ -263,7 +268,12 @@ export class NotesTable {
         },
       });
 
-      const sentenceCell = h('div', { class: 'cell-sentence cell-clamp', title: item.sentence, text: item.sentence });
+      const sentenceCell = h('div', {
+        class: 'cell-sentence cell-clamp is-clickable',
+        title: '눌러서 해석·구문 분석 보기',
+        text: item.sentence,
+        onClick: () => toggleDetail(),
+      });
       const actions_cell = h(
         'div',
         { class: 'row-actions' },
@@ -303,13 +313,33 @@ export class NotesTable {
       // 저장된 AI 분석(문장 해석·구문 분석)을 목록에서 바로 펼쳐 볼 수 있게 한다.
       const analysis = item.analysis ?? null;
       const hasSavedAnalysis = hasAnalysis(analysis);
-      const detailRow = hasSavedAnalysis
-        ? h(
-            'tr',
-            { class: 'is-detail', hidden: true },
-            h('td', { colspan: String(COLUMNS.length) }, renderAnalysisCard(analysis, { model: analysis?.model ?? '', title: '저장된 AI 분석' })),
-          )
-        : null;
+      // 문장을 눌러도, "분석 보기"를 눌러도 같은 상세가 열린다.
+      const detailRow = h(
+        'tr',
+        { class: 'is-detail', hidden: true },
+        h(
+          'td',
+          { colspan: String(COLUMNS.length) },
+          h(
+            'div',
+            { class: 'detail-body' },
+            h('div', { class: 'detail-sentence', text: item.sentence }),
+            item.translation ? h('div', { class: 'detail-translation', text: item.translation }) : null,
+            hasSavedAnalysis
+              ? renderAnalysisCard(analysis, { model: analysis?.model ?? '', title: '저장된 AI 분석' })
+              : h('p', { class: 'muted small', text: '저장된 AI 분석이 없습니다. "수정"에서 직접 입력하거나 학습 화면에서 "AI 구문분석"을 실행해 주세요.' }),
+          ),
+        ),
+      );
+      // 상세가 하나라도 열려 있으면 목록 높이 제한을 풀어 분석 내용이 잘리지 않게 한다.
+      const syncExpanded = () => {
+        const open = Array.from(this.tbody.querySelectorAll('tr.is-detail')).some((row) => !row.hidden);
+        this.tableWrap.classList.toggle('is-expanded', open);
+      };
+      const toggleDetail = () => {
+        detailRow.hidden = !detailRow.hidden;
+        syncExpanded();
+      };
       // 저장된 분석이 부실하면(영어 구문에 한국어가 섞였거나 한국어 뜻이 비었을 때) 그 자리에서 다시 분석한다.
       const needsReanalyze =
         hasSavedAnalysis && (koreanEnglishFields(analysis).length > 0 || missingMeaningFields(analysis).length > 0);
@@ -323,9 +353,7 @@ export class NotesTable {
               type: 'button',
               title: 'AI 분석 상세 보기',
               text: '분석 보기',
-              onClick: () => {
-                detailRow.hidden = !detailRow.hidden;
-              },
+              onClick: () => toggleDetail(),
             }),
             needsReanalyze
               ? h('button', {

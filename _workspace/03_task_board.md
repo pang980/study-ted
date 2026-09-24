@@ -254,3 +254,24 @@
 - **T52(주의)**: `gh`·`git` 은 `.exe` 라 `shell:false` 로 실행하고(Node 가 인자 인용을 처리하므로 `--title "StudyTED v1.0.0"` 같은 공백 인자가 안전), `npm` 만 `.cmd` 라서 `shell:true` 로 실행한다.
 - 검증 요약: `npm test` **81/81** · `npm run smoke` **96/0** · `npm run dist` 성공(asar 안에 새 기본 주소 포함 확인) · `npm run release` **실제 실행 성공**(v1.0.0 자산 덮어쓰기 + 피드 sha256 갱신 확인).
 - **한계**: 저장소를 비공개로 바꾸면 로그인 없이 자산을 받을 수 없어 자동 업데이트가 멈춘다(이때는 직접 호스팅한 `latest.json` 주소를 설정에 넣어야 한다). 코드 사이닝은 여전히 하지 않아 설치 시 SmartScreen 경고가 뜰 수 있다.
+
+## 18차 라운드 완료 기록 (2026-09-24)
+
+사용자 요청 4건(① AI 분석이 선택한 문장이 아니라 **동영상 제목**을 해석함 ② 문장 노트에서 **문장을 누르면 내용 바로 보기** ③ **삭제 버튼 무동작** ④ **분석 보기가 지정 높이에서 잘림**)을 처리했다. T53~T56 을 추가했다.
+
+| 태스크 | 내용 | 상태 | 수정 파일 |
+|---|---|---|---|
+| T53 | AI 분석 대상이 동영상 제목으로 새는 문제 수정 | DONE | `main/ai/openrouter.js`, `test/ai-parse.test.js` |
+| T54 | 문장 노트: 문장 클릭으로 해석·구문 분석 상세 열기 | DONE | `renderer/js/components/notes-table.js`, `renderer/css/views.css` |
+| T55 | 삭제 버튼 무동작(확인 창이 항상 취소로 확정) 수정 | DONE | `renderer/js/ui.js`, `renderer/js/components/notes-table.js` |
+| T56 | 분석 보기 펼칠 때 목록 높이 제한 해제 + 검증 추가 | DONE | `renderer/js/components/notes-table.js`, `renderer/css/views.css`, `scripts/smoke.js` |
+
+- **T53(원인)**: 전달 경로(`main/ipc.js` → `renderer/js/actions.js` → `api.ai.analyze`)는 정상이었다. `userPrompt()` 가 `Video title:` / `Surrounding context:` 를 `Sentence:` **바로 앞**에 두고 있었고, 지시문이 "문장을 분석하라"는 한 줄뿐이라 약한 모델(llama-3.1-8b)이 가장 가까운 제목을 대상으로 삼았다. 실제 DB 에 `sentences.id=4` 의 `translation` 에 동영상 제목(`고양이가 왜 미치지 않는가? - Jaap de Roode`)이 저장돼 있었다.
+- **T53(수정)**: `systemPrompt()` 에 "분석 대상은 항상 `Sentence:` 로 시작하는 한 줄이고 제목·문맥은 참고용" 두 문장을 추가하고, `userPrompt()` 는 제목·문맥을 `Reference only (never translate or analyze these):` 블록으로 묶어 **위로 올리고**, `Analysis target:` 안내와 `Sentence:` 를 **메시지 맨 끝**에 배치했다. 제목·문맥이 없으면 `Reference only` 줄 자체를 출력하지 않는다.
+- **T54(수정)**: 상세 행(`tr.is-detail`)을 **분석이 저장된 행에만** 만들던 것을 **모든 행에 항상** 만들도록 바꿨다. 상세 본문은 `.detail-body` 안에 문장 전체(`.detail-sentence`) · 해석(`.detail-translation`, 있을 때) · 저장된 분석 카드(또는 "저장된 AI 분석이 없습니다. …" 안내) 순서로 쌓는다. 문장 셀(`.cell-sentence.is-clickable`)을 누르면 `toggleDetail()`, `분석 보기` 버튼을 눌러도 같은 상세가 열린다.
+- **T55(원인)**: `confirmDialog()` 가 `dialog.close()` 를 **먼저** 부르고 `resolve(true)` 를 나중에 불렀는데, `close()` 가 `onClose: () => resolve(false)` 를 동기로 실행해 **확인을 눌러도 항상 `false`** 로 확정됐다(그래서 삭제가 조용히 취소됐다). 내보내기 다이얼로그도 같은 순서 문제가 있었다.
+- **T55(수정)**: `settled` 플래그 + `done(value)` 로 "처음 확정한 값 하나만" 남기게 했다. 확인 → `done(true)` → `close()`, 취소 → `done(false)` → `close()`, `onClose` → `done(false)`. 내보내기 다이얼로그는 `resolve` 를 `close()` 앞으로 옮겼다.
+- **T56(수정)**: `.table-wrap` 의 `max-height: 360px` 때문에 펼친 분석이 잘렸다. `NotesTable` 이 감싸는 요소를 `this.tableWrap` 으로 기억하고, 상세가 하나라도 열려 있으면 `is-expanded`(`max-height: none`)를 켠다. 행을 다시 그리면(`renderRows`) 클래스를 먼저 지워 원래 높이로 돌린다.
+- **T56(검증 추가)**: 스모크에 3건 추가 — 상세 행 수(`detailRows`)=`rows` 이면서 분석 카드·버튼·요약이 서로 일치, **문장 클릭으로 상세 토글**, **분석 보기 펼칠 때 `max-height: none` + 본문 높이 > 40px**, 그리고 `runViewChecks` 뒤에 **삭제 버튼 → 확인 창 → 실제 삭제(4 → 3)** 확인.
+- 검증 요약: 문법 0 실패 · 단위 **82/82**(T53 회귀 테스트 1건 추가) · 스모크 **99/0**(기존 96 + 3건, 이전 라운드의 `notes` 단언을 새 동작에 맞게 조정)
+- **남은 정리(사용자 선택)**: 기존에 오염된 행(`sentences.id=4` 해석=동영상 제목, `id=5` 구문이 단어 단위 + 한국어 뜻 빈 값)은 앱에서 그 줄의 `AI 다시 분석` 버튼을 누르면 새 프롬프트로 교정된다. 삭제한 `id=1`(`scale a cheery`)처럼 앞뒤가 잘린 문장도 같은 경로로 다시 분석하면 된다.

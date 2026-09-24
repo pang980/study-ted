@@ -487,3 +487,24 @@ test('analyzeSentence 가 단어로 쪼갠 구문을 한 번 더 요청해 묶�
   assert.deepEqual(ai.analysisIssues(result.analysis), []);
   assert.ok(bodies[1].messages.some((message) => message.content.includes('Merge the single words into meaningful phrases')));
 });
+
+test('프롬프트가 동영상 제목이 아니라 문장 하나만 분석하라고 지시한다', () => {
+  const system = ai.systemPrompt('ko');
+  assert.ok(system.includes('The analysis target is always the single line that starts with "Sentence:".'));
+  assert.ok(system.includes('never analyze it instead of that sentence'));
+
+  const user = ai.userPrompt({ sentence: 'Along with their research teams.', videoTitle: 'How cats purr', context: 'previous line' });
+  const lines = user.split('\n');
+  // 분석 대상 문장은 언제나 마지막 줄이다. 제목이 뒤에 오면 약한 모델이 제목을 분석한다.
+  assert.equal(lines[lines.length - 1], 'Sentence: Along with their research teams.');
+  assert.ok(user.includes('Reference only (never translate or analyze these):'));
+  assert.ok(user.includes('- Video title: How cats purr'));
+  assert.ok(user.includes('- Surrounding context: previous line'));
+  assert.ok(user.indexOf('- Video title: How cats purr') < user.indexOf('Sentence: Along with their research teams.'));
+  assert.ok(user.includes('Analysis target: the one English sentence below.'));
+
+  // 제목도 문맥도 없으면 참고 블록 자체가 나오지 않는다.
+  const plain = ai.userPrompt({ sentence: 'I want to talk about it.' });
+  assert.equal(plain.includes('Reference only'), false);
+  assert.equal(plain.split('\n').pop(), 'Sentence: I want to talk about it.');
+});

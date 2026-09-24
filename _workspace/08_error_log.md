@@ -136,3 +136,10 @@
 | 2026-09-24 | 검증 | `curl` 결과를 `ConvertFrom-Json` 하니 `version`·`sha256` 이 빈 값 | PowerShell 파이프라인에서 `curl.exe` 출력이 줄 배열로 들어와 직렬화가 어긋났다 | `curl -o <파일>` 로 받은 뒤 `Get-Content -Encoding UTF8` 로 읽어 변환 | 해결 |
 | 2026-09-24 | 배포 스크립트 | `spawnSync(..., { shell: true })` 로 `gh` 를 부르면 `--title StudyTED v1.0.0` 이 공백에서 쪼개질 위험 | `shell:true` 는 인자 배열을 인용 없이 공백으로 이어 붙인다 | `gh`·`git` 은 `shell:false`(Node 가 인용 처리), `.cmd` 인 `npm` 만 `shell:true` 로 분리 | 해결 |
 | 2026-09-24 | 문서 작성 | 하네스 표 안에 코드로 쓴 파이프 문자가 셀 구분자로 해석될 뻔함 | 마크다운 표 셀 안의 `\|` 이스케이프 규칙 | 해당 셀 문구를 파이프 없는 표현으로 바꿔 다시 작성 | 해결 |
+
+| 날짜 | 영역 | 증상 | 원인 | 해결 |
+|---|---|---|---|---|
+| 2026-09-24 | AI 분석 | `AI 구문분석` 을 누르면 선택한 문장이 아니라 **동영상 제목**의 해석이 저장됨(`sentences.id=4` 의 `translation` 이 `고양이가 왜 미치지 않는가? - Jaap de Roode`) | `userPrompt()` 가 `Video title:` 을 `Sentence:` 바로 앞에 두고, 지시문은 "문장을 분석하라" 뿐이었다. 약한 모델이 가장 가까운 제목을 대상으로 삼았다(전달 경로 `ipc`/`actions` 는 정상) | 제목·문맥을 `Reference only` 블록으로 묶어 위로 올리고 `Sentence:` 를 메시지 마지막 줄로 고정 + 시스템 프롬프트에 대상 규칙 2줄 추가(D-036) |
+| 2026-09-24 | 문장 노트 | `삭제` 를 누르고 확인을 눌러도 문장이 지워지지 않음 | `confirmDialog()` 가 `dialog.close()` 를 먼저 불렀고 그 안에서 `onClose: () => resolve(false)` 가 동기 실행돼 **확인(true) 이 무시되고 항상 false 로 확정**됐다 | `settled` 플래그 + `done(value)` 로 처음 확정한 값만 남기게 수정(내보내기 다이얼로그의 `resolve`/`close` 순서도 함께 교체) |
+| 2026-09-24 | 검증(스모크) | `view:notes 분석 보기 높이 해제` 가 `bodyHeight:0` 으로 실패 | 검증 코드가 **두 번째 클릭(닫기) 이후**에 `getBoundingClientRect()` 를 호출해 높이가 0 이었다(앱 코드는 정상) | 열려 있을 때 높이를 재도록 검증 코드 수정 |
+| 2026-09-24 | 검증(스모크) | `view:notes 문장 클릭 상세` 가 `first.expanded=true` 로 실패 | 앞선 `분석 펼치기` 검증이 상세를 열어 둔 채 끝나 `is-expanded` 가 남아 있었다 | 문장 클릭 검증 시작 시 열린 상세를 모두 닫고 기준 상태를 측정 |

@@ -249,6 +249,8 @@ function systemPrompt(targetLang) {
     'Never translate that field and never put a Korean word inside it.',
     'Copy structure[].part from the sentence exactly as it is written.',
     'Every structure item must also have a Korean "meaning" and a short Korean "note". Never leave them empty.',
+    'The analysis target is always the single line that starts with "Sentence:".',
+    'A video title or surrounding context is reference only: never translate it and never analyze it instead of that sentence.',
   ].join(' ');
 }
 
@@ -259,6 +261,9 @@ function userPrompt({ sentence, context, videoTitle }) {
     '  "translation": "한국어 해석 한 줄",',
     '  "structure": [{ "part": "영어 구문 (문장에서 그대로 복사)", "meaning": "한국어 의미", "note": "한국어로 쉬운 설명" }]',
     '}',
+    'What to analyze:',
+    '- The analysis target is ONLY the line that starts with "Sentence:" at the very end of this message.',
+    '- Video title and surrounding context are reference only. Never translate them and never use them as the target.',
     'Language rules (most important):',
     '- "part" MUST be English only. Copy it from the sentence exactly as written.',
     '- Never write Korean (한글) inside "part".',
@@ -269,8 +274,10 @@ function userPrompt({ sentence, context, videoTitle }) {
     '- "note" is a short Korean grammar note for that chunk. It must never be empty.',
     '- Return only the keys "translation" and "structure".',
     '- Use plain Korean without markdown.',
-    videoTitle ? `Video title: ${videoTitle}` : '',
-    context ? `Surrounding context: ${context}` : '',
+    videoTitle || context ? 'Reference only (never translate or analyze these):' : '',
+    videoTitle ? `- Video title: ${videoTitle}` : '',
+    context ? `- Surrounding context: ${context}` : '',
+    'Analysis target: the one English sentence below. It is the only text you translate and split into chunks.',
     `Sentence: ${sentence}`,
   ]
     .filter(Boolean)

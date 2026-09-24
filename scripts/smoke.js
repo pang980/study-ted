@@ -28,7 +28,7 @@ const VIEW_PROBES = {
   home: "(() => { const q = (s) => document.querySelectorAll(s).length; return { cards: q('.thumb-grid .video-card'), lines: q('.transcript-line'), table: q('.data-table tbody tr'), title: (document.querySelector('.view__title')||{}).textContent || null }; })()",
   channels: "(() => { const q = (s) => document.querySelectorAll(s).length; const stop = Array.from(document.querySelectorAll('.btn--danger')).map((b) => b.textContent.trim()); return { cards: q('.card'), rows: q('.list-row'), channelRows: q('.list-row .list-row__title'), counts: q('.channel-counts'), countText: (document.querySelector('.channel-counts') || {}).textContent || null, stopButtons: stop }; })()",
   learn: "(() => { const q = (s) => document.querySelectorAll(s).length; const countEl = document.querySelector('.picker-count'); return { picker: q('.picker-item'), modes: q('.mode-switch__btn'), thumbs: q('.picker-item .thumb'), titles: q('.picker-item__title'), search: q('.picker-search'), pager: q('.picker-pager'), countText: countEl ? (countEl.textContent || '') : null }; })()",
-  notes: "(() => { const q = (s) => document.querySelectorAll(s).length; const details = q('.data-table tbody tr.is-detail'); const bodyRows = q('.data-table tbody tr') - details; return { table: bodyRows, rows: bodyRows, details, cards: q('.data-table tbody tr.is-detail .analysis'), summaries: q('.data-table .analysis-summary'), toggleButtons: [...document.querySelectorAll('.data-table button')].filter((b) => (b.textContent || '').trim() === '분석 보기').length }; })()",
+  notes: "(() => { const q = (s) => document.querySelectorAll(s).length; const detailRows = q('.data-table tbody tr.is-detail'); const details = q('.data-table tbody tr.is-detail .analysis'); const bodyRows = q('.data-table tbody tr') - detailRows; return { table: bodyRows, rows: bodyRows, detailRows, details, cards: q('.data-table tbody tr.is-detail .analysis'), summaries: q('.data-table .analysis-summary'), toggleButtons: [...document.querySelectorAll('.data-table button')].filter((b) => (b.textContent || '').trim() === '분석 보기').length }; })()",
   materials: "(() => { const q = (s) => document.querySelectorAll(s).length; return { groups: q('.material-group'), rows: q('.listbox .list-row') }; })()",
   share: "(() => { const q = (s) => document.querySelectorAll(s).length; return { chips: q('.chip-row .chip'), selects: q('.select') }; })()",
   settings: "(() => { const q = (s) => document.querySelectorAll(s).length; return { cards: q('.card'), hasOpenRouter: document.body.textContent.includes('OpenRouter'), inputs: q('.input'), modelSearch: q('.input--search'), valueList: q('.model-list--value'), modelRows: q('.model-row'), valueNote: (document.querySelector('.model-list--value') || {}).textContent || null }; })()",
@@ -442,7 +442,7 @@ async function runViewChecks(win) {
       // 저장된 AI 분석(문장 해석·구문 분석)이 목록에서 바로 보이고 펼칠 수 있어야 한다.
       record(
         'view:notes 분석 표시',
-        probe.details > 0 && probe.cards === probe.details && probe.toggleButtons === probe.details && probe.summaries === probe.details,
+        probe.details > 0 && probe.detailRows === probe.rows && probe.cards === probe.details && probe.toggleButtons === probe.details && probe.summaries === probe.details,
         `상세 ${probe.details} / 카드 ${probe.cards} / 버튼 ${probe.toggleButtons} / 요약 ${probe.summaries}`,
       );
       // eslint-disable-next-line no-await-in-loop
@@ -489,6 +489,66 @@ async function runViewChecks(win) {
       );
       // AI 원문 응답 섹션은 카드에서 제거됐다.
       record('view:notes AI 원문 응답 없음', Boolean(toggled.ok) && toggled.rawBox === false && toggled.rawTitle === false, toggled.ok ? { rawBox: toggled.rawBox, rawTitle: toggled.rawTitle } : toggled);
+      // 문장을 누르면 같은 행의 상세가 열려 해석·구문 분석을 목록에서 바로 볼 수 있어야 한다.
+      // eslint-disable-next-line no-await-in-loop
+      const sentenceClick = await win.webContents.executeJavaScript(
+        `(() => {
+           const cell = document.querySelector('.data-table tbody tr .cell-sentence');
+           const wrap = document.querySelector('.table-wrap');
+           if (!cell || !wrap) return { ok: false, reason: 'cell/wrap 없음' };
+           const detail = cell.closest('tr').nextElementSibling;
+           if (!detail || !detail.classList.contains('is-detail')) return { ok: false, reason: '상세 행 없음' };
+           // 앞선 확인에서 펼쳐 둔 상세를 닫고 기본 상태로 돌린다.
+           document.querySelectorAll('.data-table tbody tr.is-detail:not([hidden])').forEach((open) => {
+             const row = open.previousElementSibling;
+             const summary = row ? row.querySelector('.analysis-summary') : null;
+             const btn = summary && summary.parentElement ? summary.parentElement.querySelector('button') : null;
+             if (btn) btn.click();
+           });
+           const first = { hidden: detail.hidden, expanded: wrap.classList.contains('is-expanded') };
+           cell.click();
+           const second = { hidden: detail.hidden, expanded: wrap.classList.contains('is-expanded') };
+           cell.click();
+           const third = { hidden: detail.hidden, expanded: wrap.classList.contains('is-expanded') };
+           return { ok: true, first, second, third };
+         })()`,
+        true,
+      );
+      record(
+        'view:notes 문장 클릭 상세',
+        Boolean(sentenceClick.ok)
+          && sentenceClick.first.hidden === true
+          && sentenceClick.second.hidden === false
+          && sentenceClick.second.expanded === true
+          && sentenceClick.third.hidden === true
+          && sentenceClick.third.expanded === false,
+        JSON.stringify(sentenceClick),
+      );
+      // 상세를 펼치면 목록 높이 제한이 풀려 분석 내용이 끝까지 보여야 한다.
+      // eslint-disable-next-line no-await-in-loop
+      const expandedWrap = await win.webContents.executeJavaScript(
+        `(() => {
+           const wrap = document.querySelector('.table-wrap');
+           const summary = document.querySelector('.data-table tbody tr .analysis-summary');
+           const btn = summary && summary.parentElement ? summary.parentElement.querySelector('button') : null;
+           if (!wrap || !btn) return { ok: false, reason: 'wrap/버튼 없음' };
+           const before = getComputedStyle(wrap).maxHeight;
+           btn.click();
+           const open = getComputedStyle(wrap).maxHeight;
+           const opened = wrap.querySelector('tr.is-detail:not([hidden]) .detail-body');
+           const bodyHeight = opened ? Math.round(opened.getBoundingClientRect().height) : 0;
+           const scroll = wrap.scrollHeight <= wrap.clientHeight + 2;
+           btn.click();
+           const shut = getComputedStyle(wrap).maxHeight;
+           return { ok: true, before, open, shut, scroll, bodyHeight };
+         })()`,
+        true,
+      );
+      record(
+        'view:notes 분석 보기 높이 해제',
+        Boolean(expandedWrap.ok) && expandedWrap.before !== 'none' && expandedWrap.open === 'none' && expandedWrap.shut !== 'none' && expandedWrap.bodyHeight > 40,
+        JSON.stringify(expandedWrap),
+      );
     }
     if (id === 'settings') {
       // 키가 없어 모델 목록이 비어 있어도 가성비 추천·모델 검색 영역은 자리를 잡아야 한다.
@@ -773,6 +833,42 @@ async function run() {
   await sleep(800);
 
   await runViewChecks(win);
+
+  // 삭제 버튼은 확인 창에서 확인을 눌렀을 때 실제로 문장을 지워야 한다.
+  await win.webContents.executeJavaScript(
+    `(() => { const button = document.querySelector('.nav__item[data-view="notes"]'); if (button) button.click(); return true; })()`,
+    true,
+  );
+  await waitFor(win, "document.querySelector('.data-table tbody tr') !== null", 6000);
+  await sleep(400);
+  const deleteCheck = await win.webContents.executeJavaScript(
+    `(async () => {
+       const rows = () => document.querySelectorAll('.data-table tbody tr:not(.is-detail)').length;
+       const before = rows();
+       const del = [...document.querySelectorAll('.data-table tbody tr .row-actions button')].find((b) => (b.title || '').trim() === '삭제');
+       if (!del) return { ok: false, reason: '삭제 버튼 없음' };
+       del.click();
+       for (let i = 0; i < 80; i += 1) {
+         await new Promise((resolve) => setTimeout(resolve, 50));
+         if (document.querySelector('.modal-backdrop')) break;
+       }
+       const foot = document.querySelector('.modal__foot');
+       const confirm = foot ? foot.querySelector('.btn--danger') || foot.querySelector('button:last-child') : null;
+       if (!confirm) return { ok: false, reason: '확인 버튼 없음' };
+       confirm.click();
+       for (let i = 0; i < 120; i += 1) {
+         await new Promise((resolve) => setTimeout(resolve, 50));
+         if (rows() < before) break;
+       }
+       return { ok: true, before, after: rows(), closed: !document.querySelector('.modal-backdrop') };
+     })()`,
+    true,
+  );
+  record(
+    'view:notes 삭제 동작',
+    Boolean(deleteCheck.ok) && deleteCheck.after === deleteCheck.before - 1 && deleteCheck.closed === true,
+    deleteCheck.ok ? `${deleteCheck.before} → ${deleteCheck.after}` : JSON.stringify(deleteCheck),
+  );
 
   const cleared = await win.webContents.executeJavaScript('window.studyTed.demo.clear()', true);
   record('demo.clear', Boolean(cleared && cleared.ok), cleared && cleared.data && cleared.data.counts);

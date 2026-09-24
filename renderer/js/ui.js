@@ -132,13 +132,21 @@ export function openModal({ title, body, foot = null, onClose = null }) {
 
 export function confirmDialog({ title = '확인', message, confirmText = '확인', danger = false }) {
   return new Promise((resolve) => {
+    // 닫기를 먼저 하면 onClose 가 resolve(false) 를 먼저 호출해 확인을 눌러도 취소로 처리된다.
+    // 어떤 경로로 닫히든 처음 확정한 값 하나만 남긴다.
+    let settled = false;
+    const done = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
     const confirmBtn = h('button', {
       class: `btn ${danger ? 'btn--danger' : 'btn--primary'}`,
       type: 'button',
       text: confirmText,
       onClick: () => {
+        done(true);
         dialog.close();
-        resolve(true);
       },
     });
     const dialog = openModal({
@@ -150,13 +158,13 @@ export function confirmDialog({ title = '확인', message, confirmText = '확인
           type: 'button',
           text: '취소',
           onClick: () => {
+            done(false);
             dialog.close();
-            resolve(false);
           },
         }),
         confirmBtn,
       ],
-      onClose: () => resolve(false),
+      onClose: () => done(false),
     });
   });
 }

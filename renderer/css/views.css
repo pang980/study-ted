@@ -511,6 +511,11 @@
   overflow: auto;
 }
 
+/* 상세를 펼치면 높이 제한을 풀어 분석 내용이 끝까지 보이게 한다. */
+.table-wrap.is-expanded {
+  max-height: none;
+}
+
 .data-table {
   width: 100%;
   border-collapse: collapse;
@@ -555,10 +560,40 @@
   background: #f8fbff;
 }
 
+/* 펼친 상세: 문장 전체와 해석, 저장된 분석 카드를 위에서 아래로 쌓는다. */
+.detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 2px 4px;
+}
+
+.detail-sentence {
+  font-family: var(--font-en);
+  font-weight: 600;
+  line-height: 1.65;
+  color: #1d2b41;
+}
+
+.detail-translation {
+  line-height: 1.65;
+  color: var(--muted);
+}
+
 .cell-sentence {
   font-family: var(--font-en);
   font-weight: 600;
   color: #1d2b41;
+}
+
+/* 문장을 누르면 해석·구문 분석이 그 자리에서 열린다. */
+.cell-sentence.is-clickable {
+  cursor: pointer;
+}
+
+.cell-sentence.is-clickable:hover {
+  color: var(--primary);
+  text-decoration: underline;
 }
 
 .cell-clamp {

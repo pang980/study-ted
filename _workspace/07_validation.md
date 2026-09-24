@@ -769,3 +769,30 @@ npm run dist      # node scripts/prepare-bin.js && electron-builder --win && nod
 - 기본 주소가 생겼으므로, 이제 **앱 시작 8초 후 실제로 GitHub 에 요청이 나간다**(16차에는 주소가 비어 있어 요청 0회였다). 네트워크가 없으면 배너가 오류 문구를 띄우고 나머지 기능은 그대로 동작한다.
 - **한계**: 저장소를 비공개로 바꾸면 인증 없는 피드 조회가 실패해 자동 업데이트가 멈춘다(설정에서 직접 호스팅 주소를 넣어야 한다). 릴리스 자산만으로 업데이트하므로 **설치본을 받는 사람도 인터넷과 GitHub 접근이 필요**하다.
 - **한계**: 코드 사이닝 미적용 → SmartScreen 경고 가능. `npm run release` 는 `gh` CLI 로그인과 `origin` 원격이 있어야 한다(스크립트가 먼저 검사한다).
+
+## 18차 검증 기록 (2026-09-24)
+
+| 항목 | 명령 | 결과 |
+|---|---|---|
+| 문법 | `node --check` (`main/ai/openrouter.js`, `renderer/js/ui.js`, `renderer/js/components/notes-table.js`, `scripts/smoke.js`) | 0 실패 |
+| 단위 테스트 | `npm test` | **82 / 82 pass** (17차 81 + T53 회귀 1) |
+| 스모크 | `npm run smoke` | **99 확인 / 실패 0** (17차 96 + 3) |
+
+### 새로 확인한 동작
+
+- `view:notes` 프로브: `{ table:4, rows:4, detailRows:4, details:1, cards:1, summaries:1, toggleButtons:1 }` — 상세 행은 문장 4개 모두에 있고, 분석 카드·요약·`분석 보기` 버튼은 저장된 분석이 있는 1건에만 있다.
+- `view:notes 문장 클릭 상세`: `{"first":{"hidden":true,"expanded":false},"second":{"hidden":false,"expanded":true},"third":{"hidden":true,"expanded":false}}` — 누르면 열리고 다시 누르면 닫힌다.
+- `view:notes 분석 보기 높이 해제`: `{ before:"360px", open:"none", shut:"360px", scroll:true, bodyHeight:>40 }` — 펼치면 `max-height` 가 풀린다.
+- `view:notes 삭제 동작`: `4 → 3` + 모달 닫힘 — 확인 창에서 `삭제` 를 누르면 실제로 지워진다(수정 전에는 항상 취소로 확정됐다).
+- 나머지 화면 검증은 17차와 동일하게 통과(home 버전·업데이트 배너, channels 수집 개수·정지 버튼, learn 썸네일·검색·페이징·문장 전송·AI 분석, materials, share, settings 모델 검색·업데이트 카드).
+
+### 실패 → 수정 이력 (이번 라운드)
+
+1. `view:notes 분석 표시` 가 `상세 4 / 카드 1` 로 실패 → 상세 행을 모든 행에 만들도록 바꾼 뒤 **프로브·단언을 새 동작에 맞게 갱신**해 통과.
+2. `view:notes 문장 클릭 상세` 가 `first.expanded=true` 로 실패 → 앞 검증(`분석 펼치기`)이 상세를 열어 둔 채 끝난 것이 원인이었다. 검증 시작 시 열린 상세를 모두 닫고 기준 상태를 만든 뒤 통과.
+3. `view:notes 분석 보기 높이 해제` 가 `bodyHeight:0` 으로 실패 → **검증 코드 버그**. 반환 객체를 만들 때(두 번째 클릭 이후) 높이를 쟀기 때문이다. 열려 있을 때 측정하도록 옮겨 통과. 앱 코드 문제는 아니었다.
+
+### 사용자 DB 상태 점검(읽기 전용)
+
+- `%APPDATA%\study-ted\study-ted.db` 의 `sentences` 6행을 확인했다(쓰기 없음).
+- `id=4` 는 `translation` 이 동영상 제목으로 저장돼 있고(D-036 의 실제 피해), `id=5` 는 `structure[].part` 가 단어 단위(`Along` / `with` / …)이며 `meaning` 이 빈 값이다. 둘 다 화면에서 `AI 다시 분석` 버튼이 뜨는 상태라 사용자가 한 번 누르면 새 프롬프트로 교정된다.
