@@ -605,3 +605,34 @@ print  업데이트 주소(피드 URL)
   2. `view:notes 분석 보기 높이 해제` — `분석 보기` 클릭 전 `max-height=360px` → 클릭 후 `none`, 열린 상세 본문 높이 > 40px, 다시 클릭 → `360px`
   3. `view:notes 삭제 동작`(`runViewChecks` 뒤) — `title="삭제"` 버튼 → `.modal__foot .btn--danger` 클릭 → 행 수 4 → 3, 모달 닫힘
 - 검증 헬퍼는 `hidden` **속성**(:not([hidden]))이 아니라 **프로퍼티**로 열림 여부를 판단한다(둘은 같이 움직이지만, 값을 재는 시점이 닫힌 뒤면 0 이 되므로 열려 있을 때 측정한다).
+
+
+## 19차 라운드 구현 명세
+
+### 1. `renderer/js/ui.js` — `openModal()`
+
+- 배경 핸들러 제거: `h('div', { class: 'modal-backdrop', onClick: … }, modal)` → `h('div', { class: 'modal-backdrop' }, modal)`.
+- `onKeyDown(event)` 를 만들어 `event.key === 'Escape'` 일 때 `close()` 를 부르고, `document.addEventListener('keydown', onKeyDown)` 로 등록한다.
+- `close()` 첫 줄에서 `document.removeEventListener('keydown', onKeyDown)` 로 리스너를 해제한 뒤 `backdrop.remove()` → `onClose()` 순서로 진행한다(기존 `settled` 규칙 유지).
+
+### 2. `renderer/js/components/analysis-card.js`
+
+- 시그니처: `renderAnalysisCard(analysis, { model = '', title = 'AI 분석 결과', head = true } = {})`.
+- `head ? h('div', { class: 'analysis__head' }, …) : null` — 목록 상세는 `head: false` 로 제목 줄을 뺀다.
+- `koreanEnglishFields` 경고 블록과 `missingMeaningFields` 경고 블록을 **삭제**한다(`.analysis__warn` 은 어떤 화면에서도 나오지 않는다). 두 판정 함수는 export 로 유지한다.
+
+### 3. `renderer/js/components/notes-table.js`
+
+- import: `renderAnalysisCard, hasAnalysis, analysisSummaryText` 만 남긴다.
+- 상세: `.detail-translation` 줄 삭제, 카드 호출에 `head: false` 추가.
+- 분석 셀: `needsReanalyze` 계산과 `AI 다시 분석` 버튼 분기를 삭제하고 `analysis-summary` + `분석 보기`(`toggleDetail`) 만 남긴다.
+
+### 4. `renderer/js/views/materials.js`
+
+- `list-row__detail` 의 카드 호출에 `head: false` 를 추가한다(문장 노트와 동일 표시).
+
+### 5. `scripts/smoke.js` — 검증 갱신
+
+- `VIEW_PROBES.notes` 에 `warnBoxes`(`.data-table .analysis__warn`), `headRows`(`.data-table tbody tr.is-detail .analysis__head`), `aiButtons`(`.data-table .btn--ai`) 추가.
+- `view:notes 안내·재분석 버튼 없음`: 세 값이 모두 0.
+- `view:notes 편집 창 배경 클릭 유지·Esc 닫기`(삭제 동작 확인 뒤): `수정` 버튼으로 창을 열고 배경에 `MouseEvent('click')` 를 보내 **닫히지 않아야** 하고, `document` 에 `KeyboardEvent('keydown', { key: 'Escape' })` 를 보내면 닫혀야 한다.

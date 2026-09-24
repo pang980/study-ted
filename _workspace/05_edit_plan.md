@@ -299,3 +299,19 @@
 3. **닫기가 확정을 이기지 못하게**: 모달은 어떤 경로로 닫혀도 **처음 확정한 값 하나만** 남긴다(`settled`).
 4. **펼치면 제한을 푼다**: 표 높이 제한은 `max-height` 한 줄로만 풀고, 다시 그릴 때 원상 복구한다.
 5. **검증은 새 동작 기준으로**: 상세 행이 항상 존재하므로 스모크 단언을 "분석 카드 수 = 버튼 수 = 요약 수, 상세 행 수 = 행 수" 로 바꾸고, 클릭·삭제까지 실제로 확인한다.
+
+## 19차 라운드 (T57~T59)
+
+1. `renderer/js/ui.js`: `openModal()` 의 배경 클릭 닫기 제거 + Esc 닫기(리스너는 `close()` 에서 해제).
+2. `renderer/js/components/analysis-card.js`: `head` 옵션 추가, 경고 블록 2종 삭제.
+3. `renderer/js/components/notes-table.js`: 재분석 버튼·조건 제거, 상세 카드 `head: false`, 중복 해석 줄 제거.
+4. `renderer/js/views/materials.js`: 상세 카드 `head: false`.
+5. `scripts/smoke.js`: 프로브 3필드 + 검증 2건 추가.
+6. 검증: `npm test` → `npm run smoke`.
+7. 기록: `03_task_board.md`(T57~T59) · `04_file_map.md` · `05_edit_plan.md` · `06_implementation_spec.md` · `07_validation.md` · `08_error_log.md` · `99_decisions.md`(D-037)
+
+### 설계 원칙
+
+1. **모달은 명시적으로만 닫는다**: 배경 클릭은 오조작을 유발하므로 ✕·취소·Esc 만 남긴다.
+2. **안내 문구로 덮지 않는다**: 데이터가 부실하면 화면에 경고를 띄우는 대신, 표시 규칙(영어 구문 + 한국어 뜻)을 카드 자체가 지키게 한다.
+3. **화면은 한 가지 규칙**: 저장된 분석은 어디서 보든 `문장 해석` + `구문 분석` 두 섹션만 나온다(문장 패널 제외, `head` 기본값은 유지).

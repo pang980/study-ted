@@ -83,7 +83,7 @@ export function createMaterialsView({ onNavigate } = {}) {
     const analysis = item.analysis ?? null;
     const hasSavedAnalysis = hasAnalysis(analysis);
     const detail = hasSavedAnalysis
-      ? h('div', { class: 'list-row__detail', hidden: true }, renderAnalysisCard(analysis, { model: analysis?.model ?? '', title: '저장된 AI 분석' }))
+      ? h('div', { class: 'list-row__detail', hidden: true }, renderAnalysisCard(analysis, { model: analysis?.model ?? '', title: '저장된 AI 분석', head: false }))
       : null;
     const row = h(
       'div',

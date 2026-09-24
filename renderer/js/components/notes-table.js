@@ -2,7 +2,7 @@ import { h, clear, formatDate, shorten, emptyState, toast, confirmDialog, openMo
 import { api } from '../api.js';
 import * as actions from '../actions.js';
 import { parseStructureText } from './sentence-panel.js';
-import { renderAnalysisCard, hasAnalysis, analysisSummaryText, koreanEnglishFields, missingMeaningFields } from './analysis-card.js';
+import { renderAnalysisCard, hasAnalysis, analysisSummaryText } from './analysis-card.js';
 
 const SORT_OPTIONS = [
   { value: 'latest', label: '최신순' },
@@ -324,9 +324,8 @@ export class NotesTable {
             'div',
             { class: 'detail-body' },
             h('div', { class: 'detail-sentence', text: item.sentence }),
-            item.translation ? h('div', { class: 'detail-translation', text: item.translation }) : null,
             hasSavedAnalysis
-              ? renderAnalysisCard(analysis, { model: analysis?.model ?? '', title: '저장된 AI 분석' })
+              ? renderAnalysisCard(analysis, { model: analysis?.model ?? '', title: '저장된 AI 분석', head: false })
               : h('p', { class: 'muted small', text: '저장된 AI 분석이 없습니다. "수정"에서 직접 입력하거나 학습 화면에서 "AI 구문분석"을 실행해 주세요.' }),
           ),
         ),
@@ -340,9 +339,6 @@ export class NotesTable {
         detailRow.hidden = !detailRow.hidden;
         syncExpanded();
       };
-      // 저장된 분석이 부실하면(영어 구문에 한국어가 섞였거나 한국어 뜻이 비었을 때) 그 자리에서 다시 분석한다.
-      const needsReanalyze =
-        hasSavedAnalysis && (koreanEnglishFields(analysis).length > 0 || missingMeaningFields(analysis).length > 0);
       const analysisCell = hasSavedAnalysis
         ? h(
             'div',
@@ -354,26 +350,7 @@ export class NotesTable {
               title: 'AI 분석 상세 보기',
               text: '분석 보기',
               onClick: () => toggleDetail(),
-            }),
-            needsReanalyze
-              ? h('button', {
-                  class: 'btn btn--sm btn--ai',
-                  type: 'button',
-                  title: '한국어 뜻이 비었거나 한국어로 채워진 구문을 다시 분석합니다',
-                  text: 'AI 다시 분석',
-                  onClick: async (event) => {
-                    const button = event.currentTarget;
-                    button.disabled = true;
-                    try {
-                      await actions.reanalyzeSentence(item.pk, { sentence: item.sentence, videoTitle: item.videoTitle ?? null });
-                      toast('AI 분석을 다시 저장했습니다.', { type: 'success' });
-                    } catch (error) {
-                      toast(error.message, { type: 'error' });
-                      button.disabled = false;
-                    }
-                  },
-                })
-              : null,
+            })
           )
         : h('span', { class: 'muted small', text: '—' });
 

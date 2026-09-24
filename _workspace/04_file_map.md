@@ -420,3 +420,16 @@
 | `scripts/smoke.js` | `VIEW_PROBES.notes` 에 `detailRows` 추가·단언 조정, 문장 클릭 상세·분석 보기 높이 해제·삭제 동작 검증 3건 추가 | 새 동작 회귀 방지 |
 
 - 새로 만든 파일 없음(전부 기존 파일 수정).
+
+
+### 19차 라운드 (T57~T59)
+
+| 파일 | 변경 | 이유 |
+|---|---|---|
+| `renderer/js/ui.js` | `openModal()` 에서 배경 `onClick` 제거, `document` `keydown`(Escape) 닫기 추가, `close()` 에서 리스너 해제 | 수정 중 창 밖을 잘못 눌러 입력이 사라지는 문제(D-037) |
+| `renderer/js/components/analysis-card.js` | `renderAnalysisCard(analysis, { model, title, head = true })` 로 `head` 옵션 추가, `.analysis__warn` 경고 블록 2종 제거 | 저장된 분석은 해석·구문 분석만 보여 준다(D-037) |
+| `renderer/js/components/notes-table.js` | `needsReanalyze`·`AI 다시 분석` 버튼 제거, import 정리, 상세에서 `head: false` + `.detail-translation` 줄 제거 | 요청대로 재분석 버튼을 빼고 상세를 바로 보여 준다(D-037) |
+| `renderer/js/views/materials.js` | 상세 카드에 `head: false` | 문장 노트와 같은 표시 규칙 유지 |
+| `scripts/smoke.js` | notes 프로브에 `warnBoxes`/`headRows`/`aiButtons` 추가, `view:notes 안내·재분석 버튼 없음`·`view:notes 편집 창 배경 클릭 유지·Esc 닫기` 확인 추가 | 새 UI 규칙 회귀 방지 |
+
+- 새로 만든 파일 없음(전부 기존 파일 수정).

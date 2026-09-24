@@ -109,10 +109,16 @@ export function toast(message, { type = 'info', timeout = 3200 } = {}) {
 
 export function openModal({ title, body, foot = null, onClose = null }) {
   const root = document.getElementById('modal-root');
+  // 배경을 잘못 눌러 편집 내용이 사라지지 않도록 배경 클릭으로는 닫지 않는다.
+  const onKeyDown = (event) => {
+    if (event.key === 'Escape') close();
+  };
   const close = () => {
+    document.removeEventListener('keydown', onKeyDown);
     backdrop.remove();
     if (onClose) onClose();
   };
+  document.addEventListener('keydown', onKeyDown);
   const modal = h(
     'div',
     { class: 'modal' },
@@ -120,12 +126,7 @@ export function openModal({ title, body, foot = null, onClose = null }) {
     h('div', { class: 'modal__body' }, body),
     foot ? h('div', { class: 'modal__foot' }, foot) : null,
   );
-  const backdrop = h('div', {
-    class: 'modal-backdrop',
-    onClick: (event) => {
-      if (event.target === backdrop) close();
-    },
-  }, modal);
+  const backdrop = h('div', { class: 'modal-backdrop' }, modal);
   root.append(backdrop);
   return { close, modal };
 }

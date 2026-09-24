@@ -796,3 +796,13 @@ npm run dist      # node scripts/prepare-bin.js && electron-builder --win && nod
 
 - `%APPDATA%\study-ted\study-ted.db` 의 `sentences` 6행을 확인했다(쓰기 없음).
 - `id=4` 는 `translation` 이 동영상 제목으로 저장돼 있고(D-036 의 실제 피해), `id=5` 는 `structure[].part` 가 단어 단위(`Along` / `with` / …)이며 `meaning` 이 빈 값이다. 둘 다 화면에서 `AI 다시 분석` 버튼이 뜨는 상태라 사용자가 한 번 누르면 새 프롬프트로 교정된다.
+
+
+## 19차 라운드 검증 (2026-09-24)
+
+- `npm test` → **82/82 pass**(변경 없음, 회귀 없음).
+- `npm run smoke` → **101 확인 / 실패 0**. 신규 확인 2건 통과:
+  - `view:notes 안내·재분석 버튼 없음 :: 안내 0 / 제목줄 0 / 재분석 0`
+  - `view:notes 편집 창 배경 클릭 유지·Esc 닫기 :: 배경 클릭 유지 true / Esc 닫기 true`
+- 기존 항목 회귀 없음: `view:notes 분석 표시`(상세 1 / 카드 1 / 버튼 1 / 요약 1), `분석 펼치기`, `구문 영어 표시`, `구문 뜻 표시`, `AI 원문 응답 없음`, `문장 클릭 상세`, `분석 보기 높이 해제`, `삭제 동작`(4 → 3).
+- 배경 클릭으로 닫히지 않는지, Esc 로 닫히는지 실제 DOM 이벤트로 확인했다(수정 창을 열고 배경 클릭 → 유지, Esc → 닫힘).

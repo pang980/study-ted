@@ -28,7 +28,7 @@ const VIEW_PROBES = {
   home: "(() => { const q = (s) => document.querySelectorAll(s).length; return { cards: q('.thumb-grid .video-card'), lines: q('.transcript-line'), table: q('.data-table tbody tr'), title: (document.querySelector('.view__title')||{}).textContent || null }; })()",
   channels: "(() => { const q = (s) => document.querySelectorAll(s).length; const stop = Array.from(document.querySelectorAll('.btn--danger')).map((b) => b.textContent.trim()); return { cards: q('.card'), rows: q('.list-row'), channelRows: q('.list-row .list-row__title'), counts: q('.channel-counts'), countText: (document.querySelector('.channel-counts') || {}).textContent || null, stopButtons: stop }; })()",
   learn: "(() => { const q = (s) => document.querySelectorAll(s).length; const countEl = document.querySelector('.picker-count'); return { picker: q('.picker-item'), modes: q('.mode-switch__btn'), thumbs: q('.picker-item .thumb'), titles: q('.picker-item__title'), search: q('.picker-search'), pager: q('.picker-pager'), countText: countEl ? (countEl.textContent || '') : null }; })()",
-  notes: "(() => { const q = (s) => document.querySelectorAll(s).length; const detailRows = q('.data-table tbody tr.is-detail'); const details = q('.data-table tbody tr.is-detail .analysis'); const bodyRows = q('.data-table tbody tr') - detailRows; return { table: bodyRows, rows: bodyRows, detailRows, details, cards: q('.data-table tbody tr.is-detail .analysis'), summaries: q('.data-table .analysis-summary'), toggleButtons: [...document.querySelectorAll('.data-table button')].filter((b) => (b.textContent || '').trim() === '분석 보기').length }; })()",
+  notes: "(() => { const q = (s) => document.querySelectorAll(s).length; const detailRows = q('.data-table tbody tr.is-detail'); const details = q('.data-table tbody tr.is-detail .analysis'); const bodyRows = q('.data-table tbody tr') - detailRows; return { table: bodyRows, rows: bodyRows, detailRows, details, cards: q('.data-table tbody tr.is-detail .analysis'), summaries: q('.data-table .analysis-summary'), toggleButtons: [...document.querySelectorAll('.data-table button')].filter((b) => (b.textContent || '').trim() === '분석 보기').length, warnBoxes: q('.data-table .analysis__warn'), headRows: q('.data-table tbody tr.is-detail .analysis__head'), aiButtons: q('.data-table .btn--ai') }; })()",
   materials: "(() => { const q = (s) => document.querySelectorAll(s).length; return { groups: q('.material-group'), rows: q('.listbox .list-row') }; })()",
   share: "(() => { const q = (s) => document.querySelectorAll(s).length; return { chips: q('.chip-row .chip'), selects: q('.select') }; })()",
   settings: "(() => { const q = (s) => document.querySelectorAll(s).length; return { cards: q('.card'), hasOpenRouter: document.body.textContent.includes('OpenRouter'), inputs: q('.input'), modelSearch: q('.input--search'), valueList: q('.model-list--value'), modelRows: q('.model-row'), valueNote: (document.querySelector('.model-list--value') || {}).textContent || null }; })()",
@@ -444,6 +444,12 @@ async function runViewChecks(win) {
         'view:notes 분석 표시',
         probe.details > 0 && probe.detailRows === probe.rows && probe.cards === probe.details && probe.toggleButtons === probe.details && probe.summaries === probe.details,
         `상세 ${probe.details} / 카드 ${probe.cards} / 버튼 ${probe.toggleButtons} / 요약 ${probe.summaries}`,
+      );
+      // 안내 문구와 재분석 버튼은 화면에서 뺐다. 저장된 분석은 해석·구문 분석만 보여 준다.
+      record(
+        'view:notes 안내·재분석 버튼 없음',
+        probe.warnBoxes === 0 && probe.headRows === 0 && probe.aiButtons === 0,
+        '안내 ' + probe.warnBoxes + ' / 제목줄 ' + probe.headRows + ' / 재분석 ' + probe.aiButtons,
       );
       // eslint-disable-next-line no-await-in-loop
       const toggled = await win.webContents.executeJavaScript(
@@ -868,6 +874,28 @@ async function run() {
     'view:notes 삭제 동작',
     Boolean(deleteCheck.ok) && deleteCheck.after === deleteCheck.before - 1 && deleteCheck.closed === true,
     deleteCheck.ok ? `${deleteCheck.before} → ${deleteCheck.after}` : JSON.stringify(deleteCheck),
+  );
+
+  // 편집 중 창 밖을 잘못 눌러도 창이 닫히면 안 된다. 닫기는 ✕·취소·Esc 로만 한다.
+  const backdropCheck = await win.webContents.executeJavaScript(
+    `(() => {
+       const open = [...document.querySelectorAll('.data-table tbody tr .row-actions button')].find((b) => (b.title || '').trim() === '수정');
+       if (!open) return { ok: false, reason: '수정 버튼 없음' };
+       open.click();
+       const backdrop = document.querySelector('.modal-backdrop');
+       if (!backdrop) return { ok: false, reason: '수정 창이 열리지 않음' };
+       const title = (document.querySelector('.modal__head span') || {}).textContent || '';
+       backdrop.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+       const stillOpen = Boolean(document.querySelector('.modal-backdrop'));
+       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+       return { ok: true, title, stillOpen, closedByEsc: !document.querySelector('.modal-backdrop') };
+     })()`,
+    true,
+  );
+  record(
+    'view:notes 편집 창 배경 클릭 유지·Esc 닫기',
+    Boolean(backdropCheck.ok) && backdropCheck.stillOpen === true && backdropCheck.closedByEsc === true,
+    backdropCheck.ok ? '배경 클릭 유지 ' + backdropCheck.stillOpen + ' / Esc 닫기 ' + backdropCheck.closedByEsc : JSON.stringify(backdropCheck),
   );
 
   const cleared = await win.webContents.executeJavaScript('window.studyTed.demo.clear()', true);

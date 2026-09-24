@@ -275,3 +275,21 @@
 - **T56(검증 추가)**: 스모크에 3건 추가 — 상세 행 수(`detailRows`)=`rows` 이면서 분석 카드·버튼·요약이 서로 일치, **문장 클릭으로 상세 토글**, **분석 보기 펼칠 때 `max-height: none` + 본문 높이 > 40px**, 그리고 `runViewChecks` 뒤에 **삭제 버튼 → 확인 창 → 실제 삭제(4 → 3)** 확인.
 - 검증 요약: 문법 0 실패 · 단위 **82/82**(T53 회귀 테스트 1건 추가) · 스모크 **99/0**(기존 96 + 3건, 이전 라운드의 `notes` 단언을 새 동작에 맞게 조정)
 - **남은 정리(사용자 선택)**: 기존에 오염된 행(`sentences.id=4` 해석=동영상 제목, `id=5` 구문이 단어 단위 + 한국어 뜻 빈 값)은 앱에서 그 줄의 `AI 다시 분석` 버튼을 누르면 새 프롬프트로 교정된다. 삭제한 `id=1`(`scale a cheery`)처럼 앞뒤가 잘린 문장도 같은 경로로 다시 분석하면 된다.
+
+## 19차 라운드 완료 기록 (2026-09-24)
+
+사용자 요청 3건(① 문장 수정 창에서 창 밖을 누르면 창이 사라짐 ② 문장 노트의 `AI 다시 분석` 버튼 제거 ③ `분석 보기` 의 "저장된 AI 분석" 제목 줄과 경고 안내 제거 → 해석·구문 분석만 표시)을 처리했다. T57~T59 를 추가했다.
+
+| 태스크 | 내용 | 상태 | 수정 파일 |
+|---|---|---|---|
+| T57 | 모달이 배경 클릭으로 닫히던 동작 제거 + Esc 닫기 | DONE | `renderer/js/ui.js` |
+| T58 | 문장 노트 `AI 다시 분석` 버튼 제거(상세에서는 `수정` 또는 학습 화면 분석 사용) | DONE | `renderer/js/components/notes-table.js` |
+| T59 | 상세 카드에서 제목 줄·오염 경고 제거, 해석·구문 분석만 표시 | DONE | `renderer/js/components/analysis-card.js`, `renderer/js/components/notes-table.js`, `renderer/js/views/materials.js` |
+| T59-검증 | 배경 클릭 유지·Esc 닫기, 안내 문구·재분석 버튼 부재 확인 추가 | DONE | `scripts/smoke.js` |
+
+- **T57(원인)**: `openModal()` 의 배경(`.modal-backdrop`)에 `onClick` 핸들러가 있어 **모달 바깥 아무 곳이나 누르면 `close()`** 가 실행됐다. 문장을 수정하다 조금 빗나가게 누르면 입력이 통째로 사라졌다.
+- **T57(수정)**: 배경 클릭 핸들러를 없애고 `document` 의 `keydown`(Escape)으로만 닫게 했다. 닫기는 상단 ✕·하단 취소 버튼·Esc 세 가지다. 리스너는 `close()` 에서 제거해 모달을 닫은 뒤 남지 않게 했다.
+- **T58(수정)**: 분석 셀에서 `needsReanalyze` 판단과 `AI 다시 분석`(`btn--ai`) 버튼을 제거하고 `analysis-summary` + `분석 보기` 만 남겼다. `koreanEnglishFields`/`missingMeaningFields` import 도 함께 제거했다(함수 자체는 `analysis-card.js` 에 export 로 유지).
+- **T59(수정)**: `renderAnalysisCard()` 에 `head = true` 옵션을 추가하고, 목록 상세(문장 노트·학습 자료)에서는 `head: false` 로 제목 줄(`저장된 AI 분석` + 모델명)을 그리지 않는다. 오염 경고 두 종류(`.analysis__warn`)는 **함수에서 아예 제거**해 어떤 화면에서도 나오지 않는다. 상세는 `.detail-sentence`(원문) 바로 아래 `1. 문장 해석` + `2. 구문 분석` 만 보인다.
+- **T59(중복 제거)**: 상세의 `.detail-translation` 줄은 카드의 `1. 문장 해석` 과 같은 값이라 뺐다(해석만 저장된 문장도 `hasAnalysis()` 가 참이라 카드가 그대로 보여 준다).
+- 검증 요약: `npm test` **82/82** · `npm run smoke` **101 확인 / 실패 0**(`view:notes 안내·재분석 버튼 없음`, `view:notes 편집 창 배경 클릭 유지·Esc 닫기` 신규).

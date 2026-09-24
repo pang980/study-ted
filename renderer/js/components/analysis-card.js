@@ -51,38 +51,20 @@ function section(index, title, children) {
   );
 }
 
-export function renderAnalysisCard(analysis, { model = '', title = 'AI 분석 결과' } = {}) {
+export function renderAnalysisCard(analysis, { model = '', title = 'AI 분석 결과', head = true } = {}) {
   const card = h(
     'div',
     { class: 'analysis' },
-    h(
-      'div',
-      { class: 'analysis__head' },
-      h('span', { class: 'analysis__label', text: title }),
-      model ? h('span', { class: 'analysis__model', text: model }) : null,
-    ),
+    // 저장된 분석을 목록에서 펼쳐 볼 때는 제목 줄 없이 해석·구문 분석만 보여 준다.
+    head
+      ? h(
+          'div',
+          { class: 'analysis__head' },
+          h('span', { class: 'analysis__label', text: title }),
+          model ? h('span', { class: 'analysis__model', text: model }) : null,
+        )
+      : null,
   );
-
-  const koreanFields = koreanEnglishFields(analysis);
-  if (koreanFields.length) {
-    card.append(
-      h('div', {
-        class: 'analysis__warn',
-        text: `영어로 나와야 할 부분이 한국어로 저장돼 있습니다 (${koreanFields.join(', ')}). 설정에서 다른 모델을 고르고 "AI 구문분석"을 다시 실행해 주세요.`,
-      }),
-    );
-  }
-
-  // 뜻이 비어 있으면 영어 단어만 보인다. 어떤 구문인지 알려 주고 다시 분석하도록 안내한다.
-  const missingMeanings = missingMeaningFields(analysis);
-  if (missingMeanings.length) {
-    card.append(
-      h('div', {
-        class: 'analysis__warn',
-        text: `한국어 뜻이 없는 구문이 있습니다 (${missingMeanings.map((no) => `구문 ${no}`).join(', ')}). 설정에서 더 좋은 모델을 고르고 "AI 구문분석"을 다시 실행하거나, "수정"에서 직접 뜻을 넣어 주세요.`,
-      }),
-    );
-  }
 
   card.append(section(1, '문장 해석', [h('div', { class: 'analysis__translation', text: analysis?.translation || '해석 정보가 없습니다.' })]));
 
